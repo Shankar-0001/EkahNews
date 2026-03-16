@@ -4,8 +4,8 @@ import StructuredData from '@/components/seo/StructuredData'
 import { absoluteUrl } from '@/lib/site-config'
 
 export const metadata = {
-  title: 'Contact - NewsHarpal',
-  description: 'Contact the NewsHarpal editorial and support teams.',
+  title: 'Contact - EkahNews',
+  description: 'Contact the EkahNews editorial and support teams.',
 }
 
 export default async function ContactPage() {
@@ -19,11 +19,11 @@ export default async function ContactPage() {
   const schema = {
     '@context': 'https://schema.org',
     '@type': 'ContactPage',
-    name: 'Contact NewsHarpal',
+    name: 'Contact EkahNews',
     url: pageUrl,
     isPartOf: {
       '@type': 'WebSite',
-      name: 'NewsHarpal',
+      name: 'EkahNews',
       url: absoluteUrl('/'),
     },
   }
@@ -49,3 +49,4 @@ export default async function ContactPage() {
     </div>
   )
 }
+

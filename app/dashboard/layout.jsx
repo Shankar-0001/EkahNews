@@ -5,7 +5,7 @@ import DashboardThemeProvider from '@/components/layout/DashboardThemeProvider'
 import DashboardThemeToggle from '@/components/dashboard/DashboardThemeToggle'
 
 export const metadata = {
-  title: 'Dashboard - NewsHarpal',
+  title: 'Dashboard - EkahNews',
 }
 
 export default async function DashboardLayout({ children }) {
@@ -57,3 +57,4 @@ export default async function DashboardLayout({ children }) {
     </DashboardThemeProvider>
   )
 }
+

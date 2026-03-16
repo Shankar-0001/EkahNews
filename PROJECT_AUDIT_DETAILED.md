@@ -1,16 +1,16 @@
-# 📋 NewsHarpal - Complete Project Audit & Implementation Details
+# 📋 EkahNews - Complete Project Audit & Implementation Details
 
 **Last Updated:** March 4, 2026  
-**Project Name:** NewsHarpal (News Publishing CMS)  
+**Project Name:** EkahNews (News Publishing CMS)  
 **Status:** Production Ready with Network Proxies  
 
 ---
 
 ## 🎯 PROJECT OVERVIEW
 
-**NewsHarpal** is a modern news publishing CMS built with Next.js 14 and Supabase, featuring a rich text editor, authentication, role-based access control, and responsive design.
+**EkahNews** is a modern news publishing CMS built with Next.js 14 and Supabase, featuring a rich text editor, authentication, role-based access control, and responsive design.
 
-**Branding:** Changed from "NewsCMS" to "NewsHarpal" throughout the application
+**Branding:** Changed from "NewsCMS" to "EkahNews" throughout the application
 
 ---
 
@@ -35,7 +35,7 @@
 ## 📁 PROJECT STRUCTURE
 
 ```
-NewsHarpal/
+EkahNews/
 ├── app/                              # Next.js App Router
 │   ├── api/                          # API Routes (NEW PROXIES)
 │   │   ├── articles/
@@ -543,7 +543,7 @@ bc50fe6 - fix 500 errors: enable on-demand generation for category pages
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://bjlohhikzoxzviwmpucv.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=[your-key]
-NEXT_PUBLIC_BASE_URL=https://newsharpal-app.vercel.app
+NEXT_PUBLIC_BASE_URL=https://EkahNews-app.vercel.app
 ```
 
 ### `next.config.js`
@@ -660,3 +660,4 @@ For issues:
 **Project Status**: ✅ Production Ready  
 **Last Updated**: March 4, 2026  
 **Version**: 1.0.0
+

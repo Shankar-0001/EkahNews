@@ -4,8 +4,8 @@ import StructuredData from '@/components/seo/StructuredData'
 import { absoluteUrl } from '@/lib/site-config'
 
 export const metadata = {
-  title: 'Editorial Policy - NewsHarpal',
-  description: 'Read NewsHarpal editorial standards, sourcing guidelines, and content policies.',
+  title: 'Editorial Policy - EkahNews',
+  description: 'Read EkahNews editorial standards, sourcing guidelines, and content policies.',
 }
 
 export default async function EditorialPolicyPage() {
@@ -23,7 +23,7 @@ export default async function EditorialPolicyPage() {
     url: pageUrl,
     isPartOf: {
       '@type': 'WebSite',
-      name: 'NewsHarpal',
+      name: 'EkahNews',
       url: absoluteUrl('/'),
     },
   }
@@ -36,7 +36,7 @@ export default async function EditorialPolicyPage() {
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Editorial Policy</h1>
         <div className="mt-6 space-y-4 text-gray-700 dark:text-gray-300">
           <p>
-            NewsHarpal is committed to factual, fair, and transparent journalism. Our reporting is guided by
+            EkahNews is committed to factual, fair, and transparent journalism. Our reporting is guided by
             verification, accountability, and independence from outside influence.
           </p>
           <p>
@@ -52,3 +52,4 @@ export default async function EditorialPolicyPage() {
     </div>
   )
 }
+

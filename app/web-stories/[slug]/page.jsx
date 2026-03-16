@@ -15,7 +15,7 @@ export async function generateMetadata({ params }) {
     .eq('slug', params.slug)
     .maybeSingle()
 
-  if (!story) return { title: 'Story Not Found | NewsHarpal' }
+  if (!story) return { title: 'Story Not Found | EkahNews' }
 
   const firstDesc = Array.isArray(story.slides) ? story.slides[0]?.description : ''
   const description = story.seo_description || firstDesc || `Visual story: ${story.title}`
@@ -72,13 +72,13 @@ export default async function WebStoryDetailPage({ params }) {
     headline: story.title,
     description: story.seo_description || (Array.isArray(story.slides) ? story.slides[0]?.description || story.title : story.title),
     image: story.cover_image ? [story.cover_image] : [],
-    author: { '@type': 'Person', name: story.authors?.name || 'NewsHarpal' },
+    author: { '@type': 'Person', name: story.authors?.name || 'EkahNews' },
     datePublished: story.created_at,
     dateModified: story.updated_at || story.created_at,
     mainEntityOfPage: absoluteUrl(`/web-stories/${story.slug}`),
     publisher: {
       '@type': 'Organization',
-      name: 'NewsHarpal',
+      name: 'EkahNews',
       logo: { '@type': 'ImageObject', url: absoluteUrl('/logo.png') },
     },
   }
@@ -102,3 +102,4 @@ export default async function WebStoryDetailPage({ params }) {
     </div>
   )
 }
+

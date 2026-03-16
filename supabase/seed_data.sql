@@ -55,9 +55,9 @@ INSERT INTO public.tags (name, slug) VALUES
 
 -- Option 1: Create users via signup page at /signup, then run:
 
--- UPDATE public.users SET role = 'admin' WHERE email = 'admin@newsharpal.com';
--- UPDATE public.users SET role = 'author' WHERE email = 'john.smith@newsharpal.com';
--- UPDATE public.users SET role = 'author' WHERE email = 'sarah.johnson@newsharpal.com';
+-- UPDATE public.users SET role = 'admin' WHERE email = 'admin@EkahNews.com';
+-- UPDATE public.users SET role = 'author' WHERE email = 'john.smith@EkahNews.com';
+-- UPDATE public.users SET role = 'author' WHERE email = 'sarah.johnson@EkahNews.com';
 
 -- After users exist, create author profiles:
 -- (Replace the user_id UUIDs with actual UUIDs from your users table)
@@ -68,7 +68,7 @@ INSERT INTO public.tags (name, slug) VALUES
 -- Then insert authors (replace UUIDs):
 /*
 INSERT INTO public.authors (user_id, name, bio) VALUES
-('USER_ID_1', 'Admin User', 'Chief Editor and Administrator of NewsHarpal'),
+('USER_ID_1', 'Admin User', 'Chief Editor and Administrator of EkahNews'),
 ('USER_ID_2', 'John Smith', 'Technology journalist with 10+ years of experience covering AI, startups, and innovation'),
 ('USER_ID_3', 'Sarah Johnson', 'Senior reporter covering business, finance, and global markets');
 */
@@ -354,3 +354,4 @@ WHERE slug IN ('fitness', 'nutrition');
 -- FROM public.articles a 
 -- LEFT JOIN public.categories c ON a.category_id = c.id 
 -- ORDER BY a.created_at DESC;
+

@@ -14,7 +14,7 @@ export default function WebStoryViewer({ story, articleUrl }) {
   const [metrics, setMetrics] = useState({ views: 0, likes: 0, shares: 0 })
   const [touchStartX, setTouchStartX] = useState(null)
 
-  const authorName = story?.authors?.name || 'NewsHarpal'
+  const authorName = story?.authors?.name || 'EkahNews'
   const current = slides[index]
   const isCtaSlide = index === 10
   const isWhatsappSlide = index === 11
@@ -152,3 +152,4 @@ export default function WebStoryViewer({ story, articleUrl }) {
     </div>
   )
 }
+

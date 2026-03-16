@@ -113,7 +113,7 @@ SUPABASE_SERVICE_ROLE_KEY=...
 
 The application is already running on:
 - **Local**: http://localhost:3000
-- **Preview**: https://newsharpal.com
+- **Preview**: https://ekahnews.com
 
 ## User Roles
 
@@ -252,4 +252,3 @@ The application is already running on:
 
 ## License
 
-final projects

@@ -83,7 +83,7 @@ export default function DashboardNav({ user, userRole }) {
         <div className="flex items-center justify-between p-4">
           <Link href="/" className="flex items-center space-x-2">
             <Newspaper className="h-6 w-6 text-primary" />
-            <span className="font-bold text-foreground">NewsHarpal</span>
+            <span className="font-bold text-foreground">EkahNews</span>
           </Link>
           <button onClick={() => setSidebarOpen(!sidebarOpen)}>
             {sidebarOpen ? <X /> : <Menu />}
@@ -104,7 +104,7 @@ export default function DashboardNav({ user, userRole }) {
           <Link href="/" className="flex items-center space-x-3 w-full">
             <Newspaper className="h-8 w-8 text-primary" />
             <div>
-              <div className="font-bold text-foreground">NewsHarpal</div>
+              <div className="font-bold text-foreground">EkahNews</div>
               <div className="text-xs text-muted-foreground capitalize">{userRole}</div>
             </div>
           </Link>
@@ -181,3 +181,4 @@ export default function DashboardNav({ user, userRole }) {
     </>
   )
 }
+

@@ -15,7 +15,7 @@ This guide will help you populate your News CMS with realistic dummy data includ
 
 First, create user accounts via the signup page:
 
-**Go to**: `https://newsharpal.com/signup`
+**Go to**: `https://ekahnews.com/signup`
 
 **Create these accounts**:
 
@@ -362,3 +362,4 @@ INSERT INTO public.tags (name, slug) VALUES
 6. Deploy to Vercel
 
 🎉 Your News CMS is now populated with realistic dummy data!
+

@@ -17,17 +17,17 @@ import WebStoryCard from '@/components/content/WebStoryCard'
 // Revalidate homepage every 10 minutes (ISR)
 export const revalidate = 600
 
-const siteUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://newsharpal.com'
+const siteUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://EkahNews.com'
 const ogImage = `${siteUrl}/logo.png`
 
 export const metadata = {
-  title: 'NewsHarpal - Latest News and Insights',
+  title: 'EkahNews - Latest News and Insights',
   description: 'Your source for the latest news, trending stories, and expert insights across multiple categories.',
   alternates: {
     canonical: siteUrl,
   },
   openGraph: {
-    title: 'NewsHarpal - Latest News and Insights',
+    title: 'EkahNews - Latest News and Insights',
     description: 'Your source for the latest news, trending stories, and expert insights.',
     type: 'website',
     url: siteUrl,
@@ -35,7 +35,7 @@ export const metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'NewsHarpal - Latest News and Insights',
+    title: 'EkahNews - Latest News and Insights',
     description: 'Your source for the latest news, trending stories, and expert insights across multiple categories.',
     images: [ogImage],
   },
@@ -366,3 +366,4 @@ export default async function HomePage() {
     </>
   )
 }
+

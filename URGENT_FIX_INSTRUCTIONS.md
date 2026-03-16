@@ -32,8 +32,8 @@ node /app/scripts/seed-fixed.mjs
 
 **Expected Output:**
 ```
-✅ Created auth user: admin@newsharpal.com
-✅ Added admin@newsharpal.com to public.users
+✅ Created auth user: admin@ekahnews.com
+✅ Added admin@ekahnews.com to public.users
 ✅ Created author: Admin User
 ✅ Created 10 articles
 ...
@@ -61,14 +61,14 @@ Click **Run** ✅
 
 After completing all 3 steps:
 
-1. **Visit Homepage**: https://newsharpal.com
+1. **Visit Homepage**: https://ekahnews.com
    - You should see 10 news articles
 
-2. **Login**: https://newsharpal.com/login
-   - Email: `admin@newsharpal.com`
+2. **Login**: https://ekahnews.com/login
+   - Email: `admin@ekahnews.com`
    - Password: `Admin@123456`
 
-3. **Dashboard**: https://newsharpal.com/dashboard
+3. **Dashboard**: https://ekahnews.com/dashboard
    - You should see all articles, categories, authors
 
 ---
@@ -144,4 +144,5 @@ Run this in Supabase SQL Editor:
 ```sql
 ALTER TABLE auth.users DISABLE TRIGGER ALL;
 ```
+
 

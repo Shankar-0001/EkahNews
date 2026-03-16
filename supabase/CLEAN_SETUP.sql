@@ -137,7 +137,7 @@ CREATE POLICY "articles_select_policy" ON public.articles
 -- Insert demo users and authors
 INSERT INTO public.users (id, email, role)
 VALUES 
-  (gen_random_uuid(), 'demo@newsharpal.com', 'admin')
+  (gen_random_uuid(), 'demo@ekahnews.com', 'admin')
 ON CONFLICT (email) DO NOTHING;
 
 INSERT INTO public.authors (user_id, name, bio)
@@ -275,3 +275,4 @@ UNION ALL
 SELECT 'Articles', COUNT(*) FROM public.articles
 UNION ALL
 SELECT 'Published', COUNT(*) FROM public.articles WHERE status = 'published';
+

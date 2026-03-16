@@ -19,7 +19,7 @@ export async function generateMetadata({ params }) {
 
   if (!category) {
     return {
-      title: 'Category Not Found | NewsHarpal',
+      title: 'Category Not Found | EkahNews',
       description: 'Category not found.',
     }
   }
@@ -96,3 +96,4 @@ export default async function CategoryPage({ params }) {
     </div>
   )
 }
+

@@ -4,9 +4,9 @@ import SiteFooter from '@/components/layout/SiteFooter'
 import Script from 'next/script'
 
 export const metadata = {
-  title: 'NewsHarpal - Latest News and Insights',
+  title: 'EkahNews - Latest News and Insights',
   description: 'Your trusted source for breaking news, trending stories, and expert insights.',
-  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'https://newsharpal.com'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'https://EkahNews.com'),
   robots: {
     index: true,
     follow: true,
@@ -49,3 +49,4 @@ export default function RootLayout({ children }) {
     </html>
   )
 }
+

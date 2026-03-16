@@ -9,7 +9,7 @@ I've created **6 comprehensive files** designed to give you a complete, producti
 ## 📁 New Files (In Your Project Root)
 
 ```
-NewsHarpal-main/
+EkahNews-main/
 ├── ⭐ COMPLETE_FRESH_SETUP.sql 
 │   └─ 656 lines - Main SQL file (copy-paste to Supabase)
 │
@@ -102,7 +102,7 @@ Here's what makes this secure and flexible:
 
 ```
 ❌ NOT LIKE THIS:
-if (email === 'admin@newsharpal.com') role = 'admin';  // Hardcoded!
+if (email === 'admin@EkahNews.com') role = 'admin';  // Hardcoded!
 
 ✅ LIKE THIS:
 1. User signs up
@@ -432,3 +432,4 @@ Everything is set up and ready to go.
 **Start with: COMPLETE_FRESH_SETUP.sql** 
 
 🚀 Have fun building!
+

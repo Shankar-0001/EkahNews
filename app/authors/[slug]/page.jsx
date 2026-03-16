@@ -65,27 +65,27 @@ export async function generateMetadata({ params }) {
     }
 
     if (!author) {
-        return { title: 'Author Not Found | NewsHarpal' }
+        return { title: 'Author Not Found | EkahNews' }
     }
 
     const authorSlug = author.slug && !author.slug.startsWith('@') ? author.slug : author.id
     const canonical = absoluteUrl(`/authors/${authorSlug}`)
-    const description = author.bio || `Read articles by ${author.name} on NewsHarpal.`
+    const description = author.bio || `Read articles by ${author.name} on EkahNews.`
 
     return {
-        title: `${author.name} | NewsHarpal`,
+        title: `${author.name} | EkahNews`,
         description,
         alternates: { canonical },
         openGraph: {
             type: 'profile',
-            title: `${author.name} | NewsHarpal`,
+            title: `${author.name} | EkahNews`,
             description,
             url: canonical,
             images: author.avatar_url ? [{ url: author.avatar_url }] : [],
         },
         twitter: {
             card: 'summary_large_image',
-            title: `${author.name} | NewsHarpal`,
+            title: `${author.name} | EkahNews`,
             description,
             images: author.avatar_url ? [author.avatar_url] : [],
         },
@@ -147,22 +147,29 @@ export default async function AuthorProfilePage({ params }) {
         redirect(`/authors/${canonicalSlug}`)
     }
 
-    const { data: primaryArticles } = await supabase
-        .from('articles')
-        .select(`
-            id,
-            title,
-            slug,
-            excerpt,
-            featured_image_url,
-            published_at,
-            categories (name, slug),
-            authors (name)
-        `)
-        .eq('author_id', author.id)
-        .eq('status', 'published')
-        .order('published_at', { ascending: false })
-    let articles = primaryArticles || []
+    const [primaryArticlesResult, categoriesResult] = await Promise.all([
+        supabase
+            .from('articles')
+            .select(`
+                id,
+                title,
+                slug,
+                excerpt,
+                featured_image_url,
+                published_at,
+                categories (name, slug),
+                authors (name)
+            `)
+            .eq('author_id', author.id)
+            .eq('status', 'published')
+            .order('published_at', { ascending: false }),
+        supabase
+            .from('categories')
+            .select('id, name, slug')
+            .order('name'),
+    ])
+
+    let articles = primaryArticlesResult.data || []
 
     if (articles.length === 0) {
         const { data: fallbackArticles } = await supabase
@@ -183,10 +190,7 @@ export default async function AuthorProfilePage({ params }) {
         articles = fallbackArticles || articles
     }
 
-    const { data: categories } = await supabase
-        .from('categories')
-        .select('id, name, slug')
-        .order('name')
+    const categories = categoriesResult.data
 
     const authorCanonicalUrl = absoluteUrl(`/authors/${canonicalSlug}`)
     const profileSchema = {
@@ -325,3 +329,4 @@ export default async function AuthorProfilePage({ params }) {
         </div>
     )
 }
+

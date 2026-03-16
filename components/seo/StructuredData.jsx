@@ -17,7 +17,7 @@ export function NewsArticleSchema({
   url,
   category,
 }) {
-  const siteUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://newsharpal.com'
+  const siteUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://EkahNews.com'
 
   return {
     '@context': 'https://schema.org',
@@ -33,7 +33,7 @@ export function NewsArticleSchema({
     },
     publisher: {
       '@type': 'Organization',
-      name: 'NewsHarpal',
+      name: 'EkahNews',
       logo: {
         '@type': 'ImageObject',
         url: `${siteUrl}/logo.png`,
@@ -61,12 +61,12 @@ export function BreadcrumbSchema(items) {
 }
 
 export function OrganizationSchema() {
-  const siteUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://newsharpal.com'
+  const siteUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://EkahNews.com'
 
   return {
     '@context': 'https://schema.org',
     '@type': 'Organization',
-    name: 'NewsHarpal',
+    name: 'EkahNews',
     url: siteUrl,
     logo: `${siteUrl}/logo.png`,
     sameAs: [],
@@ -74,12 +74,12 @@ export function OrganizationSchema() {
 }
 
 export function WebSiteSchema() {
-  const siteUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://newsharpal.com'
+  const siteUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://EkahNews.com'
 
   return {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
-    name: 'NewsHarpal',
+    name: 'EkahNews',
     url: siteUrl,
     potentialAction: {
       '@type': 'SearchAction',
@@ -88,3 +88,4 @@ export function WebSiteSchema() {
     },
   }
 }
+

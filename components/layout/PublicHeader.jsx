@@ -41,7 +41,7 @@ export default function PublicHeader({ categories }) {
         <div className="flex items-center justify-between py-4">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2">
-            <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">NewsHarpal</span>
+            <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">EkahNews</span>
           </Link>
 
           {/* Desktop Search */}
@@ -223,3 +223,4 @@ export default function PublicHeader({ categories }) {
     </header>
   )
 }
+

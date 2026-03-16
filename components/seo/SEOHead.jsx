@@ -14,8 +14,8 @@ export default function SEOHead({
   modifiedTime,
   tags = [],
 }) {
-  const siteUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://newsharpal.com'
-  const siteName = 'NewsHarpal'
+  const siteUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://EkahNews.com'
+  const siteName = 'EkahNews'
   const fullTitle = title ? `${title} | ${siteName}` : siteName
   const canonicalUrl = canonical ? `${siteUrl}${canonical}` : siteUrl
 
@@ -63,3 +63,4 @@ export default function SEOHead({
     </Head>
   )
 }
+

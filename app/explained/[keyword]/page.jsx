@@ -44,7 +44,7 @@ export async function generateMetadata({ params }) {
   const keyword = raw.replace(/-/g, ' ').trim()
   const normalized = normalizeKeyword(keyword)
   if (!normalized) {
-    return { title: 'Explained | NewsHarpal', robots: { index: false, follow: false } }
+    return { title: 'Explained | EkahNews', robots: { index: false, follow: false } }
   }
 
   const supabase = createPublicClient(
@@ -65,7 +65,7 @@ export async function generateMetadata({ params }) {
   const url = absoluteUrl(`/explained/${normalized}`)
   const ogImage = absoluteUrl('/logo.png')
   return {
-    title: `${keyword} Explained | NewsHarpal`,
+    title: `${keyword} Explained | EkahNews`,
     description: `Simple explainers and latest context for ${keyword}, with linked source articles.`,
     keywords: `${keyword}, what is ${keyword}, ${keyword} explained, ${keyword} guide`,
     alternates: { canonical: url, languages: buildLanguageAlternates(`/explained/${normalized}`) },
@@ -188,3 +188,4 @@ export default async function ExplainedKeywordPage({ params }) {
     </div>
   )
 }
+

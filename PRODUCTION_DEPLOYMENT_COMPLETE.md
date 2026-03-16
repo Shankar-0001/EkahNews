@@ -1,4 +1,4 @@
-# 🚀 NewsHarpal Production Deployment Complete
+# 🚀 EkahNews Production Deployment Complete
 
 **10-Phase Architectural Refactor Summary**
 
@@ -302,11 +302,11 @@ export NEXT_PUBLIC_SUPABASE_URL=...
 export SUPABASE_SERVICE_ROLE_KEY=...
 
 # 3. Start (with PM2 for auto-restart)
-pm2 start npm --name "newsharpal" -- start
+pm2 start npm --name "EkahNews" -- start
 
 # 4. Verify running
 pm2 list
-pm2 logs newsharpal
+pm2 logs EkahNews
 ```
 
 ---
@@ -363,7 +363,7 @@ ONGOING:
 4. **Backups**: Automate database backups
    ```bash
    # Daily backups with pg_dump
-   0 2 * * * pg_dump $DATABASE_URL > /backups/newsharpal_$(date +\%Y\%m\%d).sql
+   0 2 * * * pg_dump $DATABASE_URL > /backups/EkahNews_$(date +\%Y\%m\%d).sql
    ```
 
 ---
@@ -418,7 +418,7 @@ After production stabilization (4 weeks):
 
 ## Conclusion
 
-**NewsHarpal is now production-ready** ✅
+**EkahNews is now production-ready** ✅
 
 After 10 comprehensive architectural phases:
 - ✅ Stable, validated API layer
@@ -437,3 +437,4 @@ After 10 comprehensive architectural phases:
 *Production Deployment Date: [Your Date]*  
 *Deployed By: [Your Name/Team]*  
 *Status: 🟢 PRODUCTION READY*
+

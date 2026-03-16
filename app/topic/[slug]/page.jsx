@@ -24,7 +24,7 @@ export async function generateMetadata({ params }) {
   const keyword = slug.replace(/-/g, ' ').trim()
   const normalized = normalizeKeyword(keyword)
   if (!normalized) {
-    return { title: 'Topic Not Found | NewsHarpal', robots: { index: false, follow: false } }
+    return { title: 'Topic Not Found | EkahNews', robots: { index: false, follow: false } }
   }
 
   const supabase = createPublicClient(
@@ -43,8 +43,8 @@ export async function generateMetadata({ params }) {
   }
 
   const canonical = absoluteUrl(`/topic/${normalized}`)
-  const title = `${keyword} News and Updates | NewsHarpal`
-  const description = `Latest news, updates, and explainers about ${keyword} on NewsHarpal.`
+  const title = `${keyword} News and Updates | EkahNews`
+  const description = `Latest news, updates, and explainers about ${keyword} on EkahNews.`
   const ogImage = absoluteUrl('/logo.png')
   const indexable = matchCount >= MIN_MATCH_COUNT
 
@@ -178,3 +178,4 @@ export default async function TopicPage({ params }) {
     </div>
   )
 }
+

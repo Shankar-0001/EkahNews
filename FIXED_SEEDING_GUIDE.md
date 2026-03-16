@@ -110,7 +110,7 @@ node /app/scripts/seed-fixed.mjs
 ## 🎯 After Successful Seeding
 
 1. **Refresh your homepage** - you'll see 10 articles
-2. **Login** at: `https://newsharpal.com/login`
+2. **Login** at: `https://ekahnews.com/login`
 3. **Test the dashboard** - all CRUD operations should work
 4. **View individual articles** - click any article to see full content
 
@@ -157,4 +157,5 @@ The script is **idempotent** - safe to run multiple times:
 ```bash
 node /app/scripts/seed-fixed.mjs
 ```
+
 

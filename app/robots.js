@@ -1,5 +1,5 @@
 export default function robots() {
-  const siteUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://newsharpal.com'
+  const siteUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://ekahnews.com'
 
   return {
     rules: [
@@ -24,4 +24,5 @@ export default function robots() {
     ],
   }
 }
+
 

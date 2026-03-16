@@ -1,6 +1,6 @@
 # PHASE 10: Production Readiness Guide
 
-Complete validation and deployment preparation for NewsHarpal after 9 phases of development.
+Complete validation and deployment preparation for EkahNews after 9 phases of development.
 
 ## Executive Summary
 
@@ -367,10 +367,10 @@ WHERE schemaname = 'public';
 
 ```bash
 # Before production, create database backup:
-pg_dump $DATABASE_URL > newsharpal_backup.sql
+pg_dump $DATABASE_URL > EkahNews_backup.sql
 
 # Verify backup is valid:
-pg_restore -t users newsharpal_backup.sql
+pg_restore -t users EkahNews_backup.sql
 ```
 
 ---
@@ -556,7 +556,7 @@ npm run start
 # Point domain to port 3000
 
 # 5. Setup auto-restart (PM2/systemd)
-pm2 start npm --name "newsharpal" -- start
+pm2 start npm --name "EkahNews" -- start
 pm2 autorestart
 ```
 
@@ -799,7 +799,7 @@ POST-DEPLOYMENT (24 HOURS):
 
 ## Conclusion
 
-NewsHarpal is now production-ready after 10 comprehensive phases:
+EkahNews is now production-ready after 10 comprehensive phases:
 
 ✅ **Core**: Stable API layer with validation & auth  
 ✅ **Performance**: ISR, caching, image optimization  
@@ -817,5 +817,6 @@ NewsHarpal is now production-ready after 10 comprehensive phases:
 
 ---
 
-*Generated for NewsHarpal production deployment*  
+*Generated for EkahNews production deployment*  
 *Last updated: 2024*
+

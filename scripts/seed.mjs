@@ -42,28 +42,28 @@ async function createUsers() {
       bio: 'System Administrator'
     },
     {
-      email: 'john.doe@newsharpal.com',
+      email: 'john.doe@ekahnews.com',
       password: 'Author@123456',
       role: 'author',
       name: 'John Doe',
       bio: 'Senior Technology Correspondent with 10 years of experience covering AI, blockchain, and innovation.'
     },
     {
-      email: 'sarah.johnson@newsharpal.com',
+      email: 'sarah.johnson@ekahnews.com',
       password: 'Author@123456',
       role: 'author',
       name: 'Sarah Johnson',
       bio: 'Health and Wellness Reporter specializing in nutrition, fitness, and medical breakthroughs.'
     },
     {
-      email: 'michael.chen@newsharpal.com',
+      email: 'michael.chen@ekahnews.com',
       password: 'Author@123456',
       role: 'author',
       name: 'Michael Chen',
       bio: 'Business and Finance Journalist covering markets, startups, and economic trends.'
     },
     {
-      email: 'emma.williams@newsharpal.com',
+      email: 'emma.williams@ekahnews.com',
       password: 'Author@123456',
       role: 'author',
       name: 'Emma Williams',
@@ -525,7 +525,7 @@ async function main() {
     console.log(`  🏷️  Tags: ${tags.length}`);
     console.log(`  📰 Articles: ${articles.length}`);
     console.log('\n🔐 Admin Credentials:');
-    console.log('  Email: admin@newsharpal.com');
+    console.log('  Email: admin@ekahnews.com');
     console.log('  Password: Admin@123456');
     console.log('\n🚀 You can now:');
     console.log('  1. Login at: ' + process.env.NEXT_PUBLIC_BASE_URL + '/login');
@@ -541,3 +541,4 @@ async function main() {
 
 // Run the seeding
 main();
+

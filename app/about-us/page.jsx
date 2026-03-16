@@ -4,8 +4,8 @@ import StructuredData from '@/components/seo/StructuredData'
 import { absoluteUrl } from '@/lib/site-config'
 
 export const metadata = {
-  title: 'About Us - NewsHarpal',
-  description: 'Learn about NewsHarpal, our newsroom values, and our commitment to responsible journalism.',
+  title: 'About Us - EkahNews',
+  description: 'Learn about EkahNews, our newsroom values, and our commitment to responsible journalism.',
 }
 
 export default async function AboutUsPage() {
@@ -19,16 +19,16 @@ export default async function AboutUsPage() {
   const schema = {
     '@context': 'https://schema.org',
     '@type': 'AboutPage',
-    name: 'About NewsHarpal',
+    name: 'About EkahNews',
     url: pageUrl,
     isPartOf: {
       '@type': 'WebSite',
-      name: 'NewsHarpal',
+      name: 'EkahNews',
       url: absoluteUrl('/'),
     },
     about: {
       '@type': 'Organization',
-      name: 'NewsHarpal',
+      name: 'EkahNews',
       url: absoluteUrl('/'),
     },
   }
@@ -38,10 +38,10 @@ export default async function AboutUsPage() {
       <StructuredData data={schema} />
       <PublicHeader categories={categories || []} />
       <main className="w-full max-w-6xl mx-auto px-4 py-10">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">About NewsHarpal</h1>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">About EkahNews</h1>
         <div className="mt-6 space-y-4 text-gray-700 dark:text-gray-300">
           <p>
-            NewsHarpal delivers timely, reliable coverage across major categories with a focus on clarity, context, and
+            EkahNews delivers timely, reliable coverage across major categories with a focus on clarity, context, and
             public value. Our newsroom prioritizes accuracy, transparency, and reader trust.
           </p>
           <p>
@@ -56,3 +56,4 @@ export default async function AboutUsPage() {
     </div>
   )
 }
+

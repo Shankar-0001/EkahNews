@@ -5,7 +5,7 @@ import { ChevronRight, Home } from 'lucide-react'
 import StructuredData, { BreadcrumbSchema } from '@/components/seo/StructuredData'
 
 export default function Breadcrumb({ items }) {
-  const siteUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://newsharpal.com'
+  const siteUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://ekahnews.com'
   
   const schemaItems = [
     { name: 'Home', url: siteUrl },
@@ -35,3 +35,4 @@ export default function Breadcrumb({ items }) {
     </>
   )
 }
+

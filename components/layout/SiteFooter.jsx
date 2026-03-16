@@ -7,7 +7,7 @@ export default function SiteFooter() {
       <div className="w-full max-w-6xl mx-auto px-4 py-10">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
-            <h3 className="text-xl font-bold mb-3">NewsHarpal</h3>
+            <h3 className="text-xl font-bold mb-3">EkahNews</h3>
             <p className="text-gray-400">Your trusted source for news and insights.</p>
             <div className="mt-4">
               <p className="text-sm font-semibold text-gray-300 mb-2">Newsletter</p>
@@ -79,9 +79,10 @@ export default function SiteFooter() {
         </div>
 
         <div className="border-t border-gray-800 mt-8 pt-6 text-center text-gray-400 text-sm">
-          <p>&copy; 2026 NewsHarpal. All rights reserved.</p>
+          <p>&copy; 2026 EkahNews. All rights reserved.</p>
         </div>
       </div>
     </footer>
   )
 }
+

@@ -4,7 +4,7 @@ import { xmlResponse } from '@/lib/sitemap-utils'
 
 const PAGE_SIZE = 1000
 const NEWS_WINDOW_MS = 2 * 24 * 60 * 60 * 1000
-const PUBLICATION_NAME = 'NewsHarpal'
+const PUBLICATION_NAME = 'EkahNews'
 const PUBLICATION_LANGUAGE = 'en'
 
 function toPageNumber(raw) {
@@ -67,3 +67,4 @@ export async function GET(_request, context) {
 
   return xmlResponse(buildNewsSitemapXml(entries))
 }
+

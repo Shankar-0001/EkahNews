@@ -1,4 +1,4 @@
-# 📊 NewsHarpal: Complete Architecture Overview
+# 📊 EkahNews: Complete Architecture Overview
 
 ## System Design After 10 Phases
 
@@ -487,4 +487,5 @@ Each commit:
 
 ---
 
-**NewsHarpal Architecture is Robust, Secure, and Production Ready** ✅
+**EkahNews Architecture is Robust, Secure, and Production Ready** ✅
+

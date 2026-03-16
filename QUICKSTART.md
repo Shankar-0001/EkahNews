@@ -58,14 +58,14 @@ Fully-featured news articles with:
 Your application will be **fully functional**!
 
 ### Test Login
-**URL:** `https://newsharpal.com/login`
+**URL:** `https://ekahnews.com/login`
 
 **Admin Credentials:**
 - Email: `admin@newscms.com`
 - Password: `Admin@123456`
 
 ### View Public Site
-**URL:** `https://newsharpal.com`
+**URL:** `https://ekahnews.com`
 
 You should see:
 - 10 news articles on the homepage
@@ -74,7 +74,7 @@ You should see:
 - Individual article pages with full content
 
 ### Access Dashboard
-**URL:** `https://newsharpal.com/dashboard`
+**URL:** `https://ekahnews.com/dashboard`
 
 You'll have access to:
 - Articles management (CRUD)
@@ -165,4 +165,5 @@ For detailed information, see:
 ```bash
 node /app/scripts/seed.mjs
 ```
+
 

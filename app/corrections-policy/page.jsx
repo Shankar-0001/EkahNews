@@ -4,8 +4,8 @@ import StructuredData from '@/components/seo/StructuredData'
 import { absoluteUrl } from '@/lib/site-config'
 
 export const metadata = {
-  title: 'Corrections Policy - NewsHarpal',
-  description: 'How NewsHarpal handles corrections, clarifications, and updates.',
+  title: 'Corrections Policy - EkahNews',
+  description: 'How EkahNews handles corrections, clarifications, and updates.',
 }
 
 export default async function CorrectionsPolicyPage() {
@@ -23,7 +23,7 @@ export default async function CorrectionsPolicyPage() {
     url: pageUrl,
     isPartOf: {
       '@type': 'WebSite',
-      name: 'NewsHarpal',
+      name: 'EkahNews',
       url: absoluteUrl('/'),
     },
   }
@@ -36,7 +36,7 @@ export default async function CorrectionsPolicyPage() {
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Corrections Policy</h1>
         <div className="mt-6 space-y-4 text-gray-700 dark:text-gray-300">
           <p>
-            NewsHarpal corrects factual errors as quickly as possible. When we update a story, we note significant
+            EkahNews corrects factual errors as quickly as possible. When we update a story, we note significant
             changes to help readers understand what was modified.
           </p>
           <p>
@@ -52,3 +52,4 @@ export default async function CorrectionsPolicyPage() {
     </div>
   )
 }
+

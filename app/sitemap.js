@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 
 export default async function sitemap() {
   const supabase = await createClient()
-  const siteUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://newsharpal.com'
+  const siteUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://ekahnews.com'
 
   // Get all categories
   const { data: categories } = await supabase
@@ -90,4 +90,5 @@ export default async function sitemap() {
     ...tagEntries,
   ]
 }
+
 

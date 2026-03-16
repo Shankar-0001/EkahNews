@@ -264,7 +264,7 @@ INSERT INTO public.authors (user_id, name, bio)
 SELECT 
   id, 
   'Admin Demo',
-  'Chief Editor of NewsHarpal with 15 years of journalism experience'
+  'Chief Editor of EkahNews with 15 years of journalism experience'
 FROM public.users WHERE email = 'demo@newscms.com'
 ON CONFLICT DO NOTHING;
 

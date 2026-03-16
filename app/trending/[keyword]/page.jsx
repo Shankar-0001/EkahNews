@@ -44,7 +44,7 @@ export async function generateMetadata({ params }) {
   const keyword = raw.replace(/-/g, ' ').trim()
   const normalized = slugFromText(keyword)
   if (!normalized) {
-    return { title: 'Trending | NewsHarpal', robots: { index: false, follow: false } }
+    return { title: 'Trending | EkahNews', robots: { index: false, follow: false } }
   }
 
   const supabase = createPublicClient(
@@ -333,3 +333,4 @@ export default async function TrendingKeywordPage({ params }) {
     </div>
   )
 }
+

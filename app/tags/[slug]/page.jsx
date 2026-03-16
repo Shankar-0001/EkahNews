@@ -19,14 +19,14 @@ export async function generateMetadata({ params }) {
 
   if (!tag) {
     return {
-      title: 'Tag Not Found | NewsHarpal',
+      title: 'Tag Not Found | EkahNews',
       description: 'Tag not found.',
     }
   }
 
   const canonical = absoluteUrl(`/tags/${tag.slug}`)
-  const title = `${tag.name} News and Updates | NewsHarpal`
-  const description = `Latest news, updates, and stories tagged with ${tag.name} on NewsHarpal.`
+  const title = `${tag.name} News and Updates | EkahNews`
+  const description = `Latest news, updates, and stories tagged with ${tag.name} on EkahNews.`
   const ogImage = absoluteUrl('/logo.png')
 
   return {
@@ -104,3 +104,4 @@ export default async function TagPage({ params }) {
     </div>
   )
 }
+

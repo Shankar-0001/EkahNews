@@ -25,15 +25,15 @@ export async function generateMetadata({ params }) {
 
   if (!category) {
     return {
-      title: 'Category Not Found | NewsHarpal',
+      title: 'Category Not Found | EkahNews',
       description: 'Category not found.',
     }
   }
 
   const canonical = absoluteUrl(`/category/${category.slug}/page/${page}`)
-  const title = `${category.name} News and Updates | Page ${page} | NewsHarpal`
+  const title = `${category.name} News and Updates | Page ${page} | EkahNews`
   const description = category.description
-    || `Latest ${category.name} news, updates, and analysis on NewsHarpal.`
+    || `Latest ${category.name} news, updates, and analysis on EkahNews.`
   const ogImage = absoluteUrl('/logo.png')
 
   return {
@@ -151,3 +151,4 @@ export default async function CategoryPagePaginated({ params }) {
     </div>
   )
 }
+

@@ -11,7 +11,7 @@ import { fetchGoogleTrendingNow } from '@/lib/trends-fetcher'
 export const revalidate = 0
 
 export const metadata = {
-  title: 'Dashboard - NewsHarpal',
+  title: 'Dashboard - EkahNews',
 }
 
 export default async function DashboardPage() {
@@ -319,3 +319,4 @@ export default async function DashboardPage() {
     </div>
   )
 }
+

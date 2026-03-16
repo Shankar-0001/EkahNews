@@ -327,7 +327,7 @@ import Image from 'next/image'
 vercel logs --follow
 
 # Self-hosted
-pm2 logs newsharpal
+pm2 logs EkahNews
 ```
 
 ### Browser DevTools
@@ -399,7 +399,7 @@ const user = await requireAuth()
 - [tailwindcss Docs](https://tailwindcss.com/docs)
 - [shadcn/ui Components](https://ui.shadcn.com)
 
-### NewsHarpal Documentation
+### EkahNews Documentation
 - [PHASE_10_PRODUCTION_READINESS.md](./PHASE_10_PRODUCTION_READINESS.md) - Full deployment guide
 - [PHASE_10_INTEGRATION_TESTING.js](./tests/PHASE_10_INTEGRATION_TESTING.js) - Test suites
 - [PRODUCTION_DEPLOYMENT_COMPLETE.md](./PRODUCTION_DEPLOYMENT_COMPLETE.md) - Initial deployment checklist
@@ -477,4 +477,5 @@ const user = await requireAuth()
 ---
 
 *Last Updated: 2024*  
-*NewsHarpal v1.0-production*
+*EkahNews v1.0-production*
+
