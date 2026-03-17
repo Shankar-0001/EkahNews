@@ -322,14 +322,14 @@ export default async function HomePage() {
 
           {categoryBlocks.length > 0 && (
             <section className="mt-12 md:mt-14">
-              <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-6">Category Blocks</h2>
+              <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-6">Categories</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {categoryBlocks.map((block) => (
                   <Card key={block.id} className="dark:bg-gray-800 dark:border-gray-700">
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="text-xl font-semibold dark:text-white">{block.name}</h3>
-                        <Link href={`/category/${block.slug}`} className="text-blue-600 dark:text-blue-400 text-sm hover:underline">View Hub</Link>
+                        <Link href={`/category/${block.slug}`} className="text-blue-600 dark:text-blue-400 text-sm hover:underline">View</Link>
                       </div>
                       <div className="space-y-3">
                         {block.articles.length > 0 ? block.articles.map((item) => (
