@@ -16,8 +16,10 @@ import WebStoryCard from '@/components/content/WebStoryCard'
 
 // Revalidate homepage every 10 minutes (ISR)
 export const revalidate = 600
+const HOMEPAGE_CATEGORY_LIMIT = 6
+const CATEGORY_ARTICLE_LIMIT = 5
 
-const siteUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://EkahNews.com'
+const siteUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://ekahnews.com'
 const ogImage = `${siteUrl}/logo.png`
 
 export const metadata = {
@@ -48,9 +50,10 @@ export default async function HomePage() {
   let categories = []
   let engagement = []
   let webStories = []
+  let homepageCategoryBlocks = []
 
   try {
-    const [articlesRes, categoriesRes, engagementRes, storiesRes] = await Promise.all([
+    const [articlesRes, categoriesRes, engagementRes, storiesRes, categoryStatsRes] = await Promise.all([
       supabase
         .from('articles')
         .select(`
@@ -79,12 +82,90 @@ export default async function HomePage() {
         .select('id, title, slug, cover_image, created_at')
         .order('created_at', { ascending: false })
         .limit(5),
+      supabase
+        .from('articles')
+        .select('id, category_id, published_at')
+        .eq('status', 'published')
+        .not('category_id', 'is', null)
+        .order('published_at', { ascending: false }),
     ])
 
     articles = articlesRes.data || []
     categories = categoriesRes.data || []
     engagement = engagementRes.data || []
     webStories = storiesRes.data || []
+
+    const categoryMetaById = new Map((categoriesRes.data || []).map((category) => [category.id, category]))
+    const categoryStats = new Map()
+
+    for (const article of categoryStatsRes.data || []) {
+      if (!article?.category_id) continue
+      const existing = categoryStats.get(article.category_id) || {
+        count: 0,
+        latestPublishedAt: article.published_at || null,
+      }
+
+      categoryStats.set(article.category_id, {
+        count: existing.count + 1,
+        latestPublishedAt: existing.latestPublishedAt || article.published_at || null,
+      })
+    }
+
+    const selectedCategoryIds = [...categoryStats.entries()]
+      .filter(([categoryId, stats]) => categoryMetaById.has(categoryId) && stats.count >= CATEGORY_ARTICLE_LIMIT)
+      .sort((a, b) => {
+        const dateA = new Date(a[1].latestPublishedAt || 0).getTime()
+        const dateB = new Date(b[1].latestPublishedAt || 0).getTime()
+        if (dateB !== dateA) return dateB - dateA
+        return (categoryMetaById.get(a[0])?.name || '').localeCompare(categoryMetaById.get(b[0])?.name || '')
+      })
+      .slice(0, HOMEPAGE_CATEGORY_LIMIT)
+      .map(([categoryId]) => categoryId)
+
+    if (selectedCategoryIds.length > 0) {
+      const { data: categoryArticles } = await supabase
+        .from('articles')
+        .select(`
+          id,
+          title,
+          slug,
+          excerpt,
+          featured_image_url,
+          published_at,
+          category_id,
+          authors (name),
+          categories (name, slug)
+        `)
+        .eq('status', 'published')
+        .in('category_id', selectedCategoryIds)
+        .order('published_at', { ascending: false })
+
+      const selectedCategorySet = new Set(selectedCategoryIds)
+      const articlesByCategoryId = new Map()
+      for (const article of categoryArticles || []) {
+        const categoryId = article.category_id
+        if (!categoryId || !selectedCategorySet.has(categoryId)) continue
+
+        const items = articlesByCategoryId.get(categoryId) || []
+        if (items.length < CATEGORY_ARTICLE_LIMIT) {
+          items.push(article)
+          articlesByCategoryId.set(categoryId, items)
+        }
+      }
+
+      homepageCategoryBlocks = selectedCategoryIds
+        .map((categoryId) => {
+          const category = categoryMetaById.get(categoryId)
+          const categoryArticlesForBlock = articlesByCategoryId.get(categoryId) || []
+          if (!category || categoryArticlesForBlock.length < CATEGORY_ARTICLE_LIMIT) return null
+
+          return {
+            ...category,
+            articles: categoryArticlesForBlock,
+          }
+        })
+        .filter(Boolean)
+    }
   } catch (error) {
     console.error('Homepage data fetch failed:', error)
   }
@@ -114,12 +195,7 @@ export default async function HomePage() {
     })
     .sort((a, b) => b._shares - a._shares)
     .slice(0, 6)
-  const categoryBlocks = (categories || [])
-    .slice(0, 4)
-    .map((category) => ({
-      ...category,
-      articles: (articles || []).filter((item) => item.categories?.slug === category.slug).slice(0, 3),
-    }))
+
 
   return (
     <>
@@ -320,26 +396,24 @@ export default async function HomePage() {
             </div>
           </div>
 
-          {categoryBlocks.length > 0 && (
+          {homepageCategoryBlocks.length > 0 && (
             <section className="mt-12 md:mt-14">
               <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-6">Categories</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {categoryBlocks.map((block) => (
-                  <Card key={block.id} className="dark:bg-gray-800 dark:border-gray-700">
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-xl font-semibold dark:text-white">{block.name}</h3>
-                        <Link href={`/category/${block.slug}`} className="text-blue-600 dark:text-blue-400 text-sm hover:underline">View</Link>
-                      </div>
-                      <div className="space-y-3">
-                        {block.articles.length > 0 ? block.articles.map((item) => (
-                          <Link key={item.id} href={`/${item.categories?.slug || 'news'}/${item.slug}`} className="block text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400">
-                            {item.title}
-                          </Link>
-                        )) : <p className="text-sm text-gray-500 dark:text-gray-400">No recent stories.</p>}
-                      </div>
-                    </CardContent>
-                  </Card>
+              <div className="space-y-10">
+                {homepageCategoryBlocks.map((block) => (
+                  <section key={block.id}>
+                    <div className="flex items-center justify-between mb-5">
+                      <h3 className="text-xl md:text-2xl font-semibold text-gray-900 dark:text-white">{block.name}</h3>
+                      <Link href={`/category/${block.slug}`} className="text-blue-600 dark:text-blue-400 text-sm hover:underline">
+                        View All
+                      </Link>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-6">
+                      {block.articles.map((article) => (
+                        <ArticleMiniCard key={article.id} article={article} compact />
+                      ))}
+                    </div>
+                  </section>
                 ))}
               </div>
             </section>
@@ -366,4 +440,3 @@ export default async function HomePage() {
     </>
   )
 }
-

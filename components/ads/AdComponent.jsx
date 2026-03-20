@@ -2,18 +2,25 @@
 
 import { useEffect } from 'react'
 
+const PLACEHOLDER_SLOTS = new Set(['1234567890', '0987654321', '1122334455', '5544332211'])
+const PLACEHOLDER_CLIENT_IDS = new Set(['ca-pub-0000000000000000', 'ca-pub-1234567890123456'])
+
 export default function AdComponent({ slot, format = 'auto', responsive = true, className = '' }) {
-  // Check if ads are enabled (you can add this to admin settings)
   const adsEnabled = process.env.NEXT_PUBLIC_ADS_ENABLED === 'true'
   const adClientId = process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID
-  
-  if (!adsEnabled || !adClientId) {
+  const hasValidSlot = !!slot && !PLACEHOLDER_SLOTS.has(slot)
+  const hasValidClientId = !!adClientId && !PLACEHOLDER_CLIENT_IDS.has(adClientId)
+
+  if (!adsEnabled || !hasValidClientId || !hasValidSlot) {
+    if (process.env.NODE_ENV === 'development' && adsEnabled && (!hasValidClientId || !hasValidSlot)) {
+      console.warn('AdSense disabled: configure real client and slot IDs before enabling ads.')
+    }
     return null
   }
 
   useEffect(() => {
     try {
-      (window.adsbygoogle = window.adsbygoogle || []).push({})
+      ;(window.adsbygoogle = window.adsbygoogle || []).push({})
     } catch (err) {
       console.error('AdSense error:', err)
     }
@@ -41,7 +48,6 @@ export default function AdComponent({ slot, format = 'auto', responsive = true, 
   )
 }
 
-// Pre-configured ad components
 export function HeaderAd() {
   return <AdComponent slot="1234567890" format="horizontal" className="mb-4" />
 }

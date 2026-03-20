@@ -36,6 +36,7 @@ export async function POST(request) {
 
         if (upsertError) {
             console.error('Error upserting user record:', upsertError)
+            return NextResponse.json({ error: 'Failed to create user profile' }, { status: 500 })
         }
 
         // Create author profile for non-admin roles.
@@ -50,6 +51,7 @@ export async function POST(request) {
 
             if (authorError) {
                 console.error('Error creating author profile:', authorError)
+                return NextResponse.json({ error: 'Failed to create author profile' }, { status: 500 })
             }
         }
 

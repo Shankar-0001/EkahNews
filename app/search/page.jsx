@@ -2,8 +2,23 @@ import { createClient } from '@/lib/supabase/server'
 import PublicHeader from '@/components/layout/PublicHeader'
 import ArticleMiniCard from '@/components/content/ArticleMiniCard'
 import { notFound } from 'next/navigation'
+import { absoluteUrl } from '@/lib/site-config'
 
 export const revalidate = 900
+
+export async function generateMetadata({ searchParams }) {
+  const query = searchParams?.q?.trim()
+
+  return {
+    title: query ? `Search results for "${query}" | EkahNews` : 'Search | EkahNews',
+    description: query ? `Search results for ${query} on EkahNews.` : 'Search EkahNews content.',
+    alternates: { canonical: absoluteUrl('/search') },
+    robots: {
+      index: false,
+      follow: false,
+    },
+  }
+}
 
 export default async function SearchPage({ searchParams }) {
   const query = searchParams?.q
@@ -41,7 +56,7 @@ export default async function SearchPage({ searchParams }) {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <PublicHeader categories={categories || []} />
       <main className="max-w-6xl mx-auto px-4 py-10">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Search results for "{query}"</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{`Search results for "${query}"`}</h1>
 
         <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {articles && articles.length > 0 ? (

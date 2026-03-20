@@ -6,6 +6,10 @@ import DashboardThemeToggle from '@/components/dashboard/DashboardThemeToggle'
 
 export const metadata = {
   title: 'Dashboard - EkahNews',
+  robots: {
+    index: false,
+    follow: false,
+  },
 }
 
 export default async function DashboardLayout({ children }) {

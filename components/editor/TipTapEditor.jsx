@@ -7,10 +7,8 @@ import { Table } from '@tiptap/extension-table'
 import { TableRow } from '@tiptap/extension-table-row'
 import { TableCell } from '@tiptap/extension-table-cell'
 import { TableHeader } from '@tiptap/extension-table-header'
-import { Link } from '@tiptap/extension-link'
 import { Youtube } from '@tiptap/extension-youtube'
 import { Image } from '@tiptap/extension-image'
-import { Underline } from '@tiptap/extension-underline'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -47,20 +45,20 @@ export default function TipTapEditor({ content, onChange, onImageUpload }) {
         heading: {
           levels: [1, 2, 3, 4],
         },
+        link: {
+          openOnClick: false,
+          HTMLAttributes: {
+            class: 'text-blue-600 underline',
+          },
+        },
+        underline: {},
       }),
-      Underline,
       Table.configure({
         resizable: true,
       }),
       TableRow,
       TableHeader,
       TableCell,
-      Link.configure({
-        openOnClick: false,
-        HTMLAttributes: {
-          class: 'text-blue-600 underline',
-        },
-      }),
       Youtube.configure({
         controls: true,
         nocookie: true,
@@ -365,7 +363,7 @@ export default function TipTapEditor({ content, onChange, onImageUpload }) {
 
       <BubbleMenu
         editor={editor}
-        tippyOptions={{ duration: 150, placement: 'top', offset: [0, 8] }}
+        options={{ placement: 'top', offset: 8 }}
         shouldShow={({ editor }) => {
           const { state } = editor
           return !state.selection.empty

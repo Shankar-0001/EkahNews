@@ -38,12 +38,14 @@ EXCEPTION
     WHEN duplicate_object THEN NULL;
 END $$;
 
--- Article status enum (includes pending for workflow)
+-- Article status enum (includes pending + archived for workflow)
 DO $$ BEGIN
-    CREATE TYPE article_status AS ENUM ('draft', 'pending', 'published');
+    CREATE TYPE article_status AS ENUM ('draft', 'pending', 'published', 'archived');
 EXCEPTION
     WHEN duplicate_object THEN NULL;
 END $$;
+
+ALTER TYPE article_status ADD VALUE IF NOT EXISTS 'archived';
 
 -- =====================================================
 -- STEP 3: CREATE TABLES (IF NOT EXISTS)
@@ -63,8 +65,12 @@ CREATE TABLE IF NOT EXISTS public.authors (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
+  slug TEXT,
+  email TEXT,
+  title TEXT,
   bio TEXT,
   avatar_url TEXT,
+  social_links JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(user_id)
@@ -98,6 +104,7 @@ CREATE TABLE IF NOT EXISTS public.articles (
   content TEXT,
   content_json JSONB,
   featured_image_url TEXT,
+  featured_image_alt TEXT,
   author_id UUID NOT NULL REFERENCES public.authors(id) ON DELETE CASCADE,
   category_id UUID REFERENCES public.categories(id) ON DELETE SET NULL,
   status article_status NOT NULL DEFAULT 'draft',
@@ -142,6 +149,7 @@ CREATE TABLE IF NOT EXISTS public.slug_history (
 CREATE INDEX IF NOT EXISTS idx_users_email ON public.users(email);
 CREATE INDEX IF NOT EXISTS idx_users_role ON public.users(role);
 CREATE INDEX IF NOT EXISTS idx_authors_user_id ON public.authors(user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS authors_slug_idx ON public.authors(slug) WHERE slug IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_categories_slug ON public.categories(slug);
 CREATE INDEX IF NOT EXISTS idx_tags_slug ON public.tags(slug);
 CREATE INDEX IF NOT EXISTS idx_articles_slug ON public.articles(slug);
@@ -156,6 +164,8 @@ CREATE INDEX IF NOT EXISTS idx_slug_history_article_id ON public.slug_history(ar
 -- Additional performance indexes
 CREATE INDEX IF NOT EXISTS idx_articles_status_published_at ON public.articles(status, published_at DESC) WHERE status = 'published';
 CREATE INDEX IF NOT EXISTS idx_articles_author_status ON public.articles(author_id, status);
+
+COMMENT ON COLUMN public.authors.social_links IS 'JSON object with social media links: {twitter, linkedin, website}';
 
 -- =====================================================
 -- STEP 5: CREATE TRIGGERS

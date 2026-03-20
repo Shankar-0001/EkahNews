@@ -6,6 +6,7 @@ import { formatDistanceToNow } from 'date-fns'
 
 export default function ArticleMiniCard({ article, compact = false }) {
   const href = `/${article.categories?.slug || 'news'}/${article.slug}`
+  const authorName = article.authors?.name
 
   return (
     <Link href={href} className="block h-full">
@@ -32,8 +33,13 @@ export default function ArticleMiniCard({ article, compact = false }) {
           {article.excerpt && (
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-400 line-clamp-2">{article.excerpt}</p>
           )}
+          {authorName && (
+            <p className="mt-3 text-sm text-gray-700 dark:text-gray-300">
+              By {authorName}
+            </p>
+          )}
           {article.published_at && (
-            <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
               {formatDistanceToNow(new Date(article.published_at), { addSuffix: true })}
             </p>
           )}

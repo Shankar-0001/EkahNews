@@ -60,6 +60,9 @@ export async function GET(request) {
             },
         })
     } catch (error) {
+        if (error.name === 'ConfigError') {
+            return apiResponse(500, null, error.message)
+        }
         if (error.name === 'AuthError') {
             const status = error.message.includes('Admin') ? 403 : 401
             return apiResponse(status, null, error.message)
@@ -74,21 +77,101 @@ export async function POST(request) {
     const requestId = 'POST-author'
 
     try {
-        // 1. Authenticate
         const user = await requireAuth()
         logger.info(`[${requestId}] User authenticated`, { userId: user.userId })
 
-        // 2. Parse & validate
         const authorData = await request.json()
         validateAuthor(authorData)
 
-        // 3. Create author with user_id
         const supabase = await createClient()
-        const { data: author, error } = await supabase
+        const admin = user.role === 'admin' ? createAdminClient() : null
+        let targetUserId = user.userId
+        let normalizedEmail = authorData.email?.trim().toLowerCase() || null
+
+        if (user.role === 'admin') {
+            if (!normalizedEmail) {
+                return apiResponse(400, null, 'Email is required when admin creates an author')
+            }
+
+            const { data: existingUser, error: userLookupError } = await admin
+                .from('users')
+                .select('id, email, role')
+                .eq('email', normalizedEmail)
+                .maybeSingle()
+
+            if (userLookupError) {
+                logger.error(`[${requestId}] User lookup error`, userLookupError)
+                return apiResponse(400, null, userLookupError.message)
+            }
+
+            if (!existingUser?.id) {
+                const { data: inviteData, error: inviteError } = await admin.auth.admin.inviteUserByEmail(normalizedEmail, {
+                    data: {
+                        name: authorData.name,
+                    },
+                })
+
+                if (inviteError) {
+                    logger.error(`[${requestId}] Invite error`, inviteError)
+                    return apiResponse(400, null, inviteError.message)
+                }
+
+                const invitedUserId = inviteData?.user?.id
+                if (!invitedUserId) {
+                    return apiResponse(500, null, 'Invited user ID was not returned')
+                }
+
+                const { error: upsertUserError } = await admin
+                    .from('users')
+                    .upsert({
+                        id: invitedUserId,
+                        email: normalizedEmail,
+                        role: 'author',
+                    }, { onConflict: 'id' })
+
+                if (upsertUserError) {
+                    logger.error(`[${requestId}] User upsert error`, upsertUserError)
+                    return apiResponse(400, null, upsertUserError.message)
+                }
+
+                targetUserId = invitedUserId
+            } else {
+                const { error: roleUpdateError } = await admin
+                    .from('users')
+                    .update({ role: 'author' })
+                    .eq('id', existingUser.id)
+
+                if (roleUpdateError) {
+                    logger.error(`[${requestId}] Role update error`, roleUpdateError)
+                    return apiResponse(400, null, roleUpdateError.message)
+                }
+
+                targetUserId = existingUser.id
+            }
+        }
+
+        const db = admin || supabase
+        const { data: existingAuthor, error: existingAuthorError } = await db
+            .from('authors')
+            .select('id')
+            .eq('user_id', targetUserId)
+            .maybeSingle()
+
+        if (existingAuthorError) {
+            logger.error(`[${requestId}] Existing author lookup error`, existingAuthorError)
+            return apiResponse(400, null, existingAuthorError.message)
+        }
+
+        if (existingAuthor) {
+            return apiResponse(409, null, 'An author profile already exists for this user')
+        }
+
+        const { data: author, error } = await db
             .from('authors')
             .insert([{
                 ...authorData,
-                user_id: user.userId,
+                email: normalizedEmail,
+                user_id: targetUserId,
             }])
             .select('id, name, slug, bio, title, email, avatar_url, social_links, user_id')
             .single()
@@ -104,6 +187,9 @@ export async function POST(request) {
         if (error.name === 'ValidationError') {
             return apiResponse(422, null, error.message)
         }
+        if (error.name === 'ConfigError') {
+            return apiResponse(500, null, error.message)
+        }
         if (error.name === 'AuthError') {
             return apiResponse(401, null, error.message)
         }
@@ -117,19 +203,17 @@ export async function PATCH(request) {
     const requestId = 'PATCH-author'
 
     try {
-        // 1. Authenticate (admin or owner)
         const user = await requireAuth()
         logger.info(`[${requestId}] User authenticated`, { userId: user.userId })
 
-        // 2. Parse & validate
         const { id, ...updateData } = await request.json()
         if (!id) {
             return apiResponse(400, null, 'Author ID is required')
         }
         validateAuthor(updateData)
 
-        // 3. Check permission (admin or owner)
         const supabase = await createClient()
+        const admin = user.role === 'admin' ? createAdminClient() : null
         const { data: existingAuthor, error: fetchError } = await supabase
             .from('authors')
             .select('id, user_id')
@@ -145,8 +229,8 @@ export async function PATCH(request) {
             return apiResponse(403, null, 'You do not have permission to update this author')
         }
 
-        // 4. Update
-        const { data: author, error } = await supabase
+        const db = admin || supabase
+        const { data: author, error } = await db
             .from('authors')
             .update(updateData)
             .eq('id', id)
@@ -180,6 +264,9 @@ export async function PATCH(request) {
         if (error.name === 'ValidationError') {
             return apiResponse(422, null, error.message)
         }
+        if (error.name === 'ConfigError') {
+            return apiResponse(500, null, error.message)
+        }
         if (error.name === 'AuthError') {
             return apiResponse(401, null, error.message)
         }
@@ -193,19 +280,16 @@ export async function DELETE(request) {
     const requestId = 'DELETE-author'
 
     try {
-        // 1. Require admin
         const user = await requireAdmin()
         logger.info(`[${requestId}] Admin authenticated`, { userId: user.userId })
 
-        // 2. Get ID
         const { id } = await request.json()
         if (!id) {
             return apiResponse(400, null, 'Author ID is required')
         }
 
-        // 3. Delete
-        const supabase = await createClient()
-        const { error } = await supabase
+        const admin = createAdminClient()
+        const { error } = await admin
             .from('authors')
             .delete()
             .eq('id', id)
@@ -218,6 +302,9 @@ export async function DELETE(request) {
         logger.info(`[${requestId}] Author deleted`, { authorId: id })
         return apiResponse(200, { success: true })
     } catch (error) {
+        if (error.name === 'ConfigError') {
+            return apiResponse(500, null, error.message)
+        }
         if (error.name === 'AuthError') {
             const status = error.message.includes('Admin') ? 403 : 401
             return apiResponse(status, null, error.message)

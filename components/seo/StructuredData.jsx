@@ -17,7 +17,7 @@ export function NewsArticleSchema({
   url,
   category,
 }) {
-  const siteUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://EkahNews.com'
+  const siteUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://ekahnews.com'
 
   return {
     '@context': 'https://schema.org',
@@ -61,7 +61,7 @@ export function BreadcrumbSchema(items) {
 }
 
 export function OrganizationSchema() {
-  const siteUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://EkahNews.com'
+  const siteUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://ekahnews.com'
 
   return {
     '@context': 'https://schema.org',
@@ -74,7 +74,7 @@ export function OrganizationSchema() {
 }
 
 export function WebSiteSchema() {
-  const siteUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://EkahNews.com'
+  const siteUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://ekahnews.com'
 
   return {
     '@context': 'https://schema.org',

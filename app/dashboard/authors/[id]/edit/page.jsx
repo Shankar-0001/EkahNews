@@ -13,6 +13,13 @@ import { ArrowLeft, Upload } from 'lucide-react'
 import Link from 'next/link'
 import slugify from 'slugify'
 
+function normalizeExternalUrl(url) {
+    const value = url?.trim()
+    if (!value) return ''
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(value)) return value
+    return `https://${value}`
+}
+
 export default function EditAuthorPage() {
     const router = useRouter()
     const params = useParams()
@@ -117,7 +124,11 @@ export default function EditAuthorPage() {
                 bio: bio || null,
                 title: title || null,
                 avatar_url: avatarUrl || null,
-                social_links: socialLinks,
+                social_links: {
+                    twitter: normalizeExternalUrl(socialLinks.twitter),
+                    linkedin: normalizeExternalUrl(socialLinks.linkedin),
+                    website: normalizeExternalUrl(socialLinks.website),
+                },
             }
 
             // Use API proxy instead of direct Supabase client

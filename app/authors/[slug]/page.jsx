@@ -4,7 +4,7 @@ import { notFound, redirect } from 'next/navigation'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
-import { Calendar } from 'lucide-react'
+import { Calendar, Linkedin } from 'lucide-react'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import Image from 'next/image'
@@ -236,35 +236,17 @@ export default async function AuthorProfilePage({ params }) {
                                 {author.bio}
                             </p>
                         )}
-                        {author.social_links && Object.keys(author.social_links).length > 0 && (
+                        {author.social_links?.linkedin && (
                             <div className="flex gap-4 mt-4">
-                                {author.social_links.twitter && (
-                                    <a
-                                        href={author.social_links.twitter}
-                                        {...getAnchorPropsForHref(author.social_links.twitter)}
-                                        className="text-blue-600 dark:text-blue-400 hover:underline"
-                                    >
-                                        Twitter
-                                    </a>
-                                )}
-                                {author.social_links.linkedin && (
-                                    <a
-                                        href={author.social_links.linkedin}
-                                        {...getAnchorPropsForHref(author.social_links.linkedin)}
-                                        className="text-blue-600 dark:text-blue-400 hover:underline"
-                                    >
-                                        LinkedIn
-                                    </a>
-                                )}
-                                {author.social_links.website && (
-                                    <a
-                                        href={author.social_links.website}
-                                        {...getAnchorPropsForHref(author.social_links.website)}
-                                        className="text-blue-600 dark:text-blue-400 hover:underline"
-                                    >
-                                        Website
-                                    </a>
-                                )}
+                                <a
+                                    href={author.social_links.linkedin}
+                                    {...getAnchorPropsForHref(author.social_links.linkedin)}
+                                    className="inline-flex items-center gap-2 rounded-full bg-[#0A66C2] px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+                                    aria-label={`${author.name} LinkedIn profile`}
+                                >
+                                    <Linkedin className="h-4 w-4" />
+                                    LinkedIn
+                                </a>
                             </div>
                         )}
                     </div>

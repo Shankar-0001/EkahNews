@@ -12,6 +12,13 @@ import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import slugify from 'slugify'
 
+function normalizeExternalUrl(url) {
+    const value = url?.trim()
+    if (!value) return ''
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(value)) return value
+    return `https://${value}`
+}
+
 export default function NewAuthorPage() {
     const router = useRouter()
     const supabase = createClient()
@@ -24,6 +31,7 @@ export default function NewAuthorPage() {
     const [bio, setBio] = useState('')
     const [title, setTitle] = useState('')
     const [avatarUrl, setAvatarUrl] = useState('')
+    const [errorMessage, setErrorMessage] = useState('')
     const [socialLinks, setSocialLinks] = useState({
         twitter: '',
         linkedin: '',
@@ -64,11 +72,19 @@ export default function NewAuthorPage() {
 
     const saveAuthor = async () => {
         if (!name) {
+            setErrorMessage('')
             alert('Author name is required')
             return
         }
 
+        if (!email) {
+            setErrorMessage('')
+            alert('Author email is required')
+            return
+        }
+
         setSaving(true)
+        setErrorMessage('')
 
         try {
             const authorData = {
@@ -78,7 +94,11 @@ export default function NewAuthorPage() {
                 bio: bio || null,
                 title: title || null,
                 avatar_url: avatarUrl || null,
-                social_links: socialLinks,
+                social_links: {
+                    twitter: normalizeExternalUrl(socialLinks.twitter),
+                    linkedin: normalizeExternalUrl(socialLinks.linkedin),
+                    website: normalizeExternalUrl(socialLinks.website),
+                },
             }
 
             // Use API proxy instead of direct Supabase client
@@ -89,13 +109,23 @@ export default function NewAuthorPage() {
             })
 
             const result = await response.json()
-            if (!response.ok) throw new Error(result.error || 'Failed to create author')
+            if (!response.ok) {
+                const message = result?.error || 'Failed to create author'
+                if (response.status === 409) {
+                    setErrorMessage('This user already has an author profile.')
+                } else {
+                    setErrorMessage(message)
+                }
+                throw new Error(message)
+            }
 
             alert('Author created successfully!')
             router.push('/dashboard/authors')
         } catch (error) {
             console.error('Error creating author:', error)
-            alert('Failed to create author: ' + error.message)
+            if (error.message !== 'An author profile already exists for this user') {
+                alert('Failed to create author: ' + error.message)
+            }
         } finally {
             setSaving(false)
         }
@@ -114,6 +144,12 @@ export default function NewAuthorPage() {
             </div>
 
             <div className="space-y-6">
+                {errorMessage && (
+                    <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                        {errorMessage}
+                    </div>
+                )}
+
                 {/* Avatar */}
                 <Card>
                     <CardHeader>
@@ -160,13 +196,15 @@ export default function NewAuthorPage() {
                             />
                         </div>
                         <div>
-                            <Label>Email</Label>
+                            <Label>Email *</Label>
                             <Input
                                 type="email"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 placeholder="author@example.com"
+                                required
                             />
+                            <p className="text-xs text-gray-500 mt-1">This email is used to link or invite the author account.</p>
                         </div>
                         <div>
                             <Label>Professional Title</Label>

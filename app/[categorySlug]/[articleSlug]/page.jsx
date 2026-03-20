@@ -81,7 +81,7 @@ export async function generateMetadata({ params }) {
       }
     }
 
-    const siteUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://EkahNews.com'
+    const siteUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://ekahnews.com'
     const articleUrl = `${siteUrl}/${article.categories?.slug || 'news'}/${article.slug}`
     const keywords = buildArticleKeywords(article)
     const authorLinkSlug = article.authors?.id
@@ -138,7 +138,7 @@ export default async function ArticlePage({ params }) {
   try {
     const supabase = await createClient()
     const { categorySlug, articleSlug } = params
-    const siteUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://EkahNews.com'
+    const siteUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://ekahnews.com'
 
   // Fetch article
   const { data: article } = await supabase
