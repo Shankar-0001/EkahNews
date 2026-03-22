@@ -9,11 +9,14 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { useToast } from '@/hooks/use-toast'
 import slugify from 'slugify'
+import { validateImageFile } from '@/lib/image-utils'
 
 export default function AuthorSettingsPage() {
   const router = useRouter()
   const supabase = createClient()
+  const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [authorId, setAuthorId] = useState(null)
@@ -56,6 +59,7 @@ export default function AuthorSettingsPage() {
       }
     } catch (error) {
       console.error('Failed to load author profile:', error)
+      toast({ variant: 'destructive', title: 'Load failed', description: 'Failed to load author profile.' })
     } finally {
       setLoading(false)
     }
@@ -63,6 +67,12 @@ export default function AuthorSettingsPage() {
 
   const handleAvatarUpload = async (file) => {
     if (!file) return
+
+    const validation = validateImageFile(file)
+    if (!validation.valid) {
+      toast({ variant: 'destructive', title: 'Upload failed', description: validation.errors.join(', ') })
+      return
+    }
 
     try {
       const fileExt = file.name.split('.').pop()
@@ -80,15 +90,16 @@ export default function AuthorSettingsPage() {
         .getPublicUrl(filePath)
 
       setAvatarUrl(publicUrl)
+      toast({ title: 'Avatar uploaded', description: 'Your avatar was uploaded successfully.' })
     } catch (error) {
       console.error('Upload error:', error)
-      alert('Failed to upload avatar')
+      toast({ variant: 'destructive', title: 'Upload failed', description: 'Failed to upload avatar.' })
     }
   }
 
   const handleSave = async () => {
     if (!name.trim()) {
-      alert('Name is required')
+      toast({ variant: 'destructive', title: 'Validation error', description: 'Name is required.' })
       return
     }
 
@@ -120,10 +131,10 @@ export default function AuthorSettingsPage() {
         setSlug(nextSlug)
       }
 
-      alert('Profile updated successfully!')
+      toast({ title: 'Profile updated', description: 'Your author profile was updated successfully.' })
     } catch (error) {
       console.error('Profile update failed:', error)
-      alert(error.message || 'Failed to save profile')
+      toast({ variant: 'destructive', title: 'Save failed', description: error.message || 'Failed to save profile.' })
     } finally {
       setSaving(false)
     }
@@ -158,11 +169,11 @@ export default function AuthorSettingsPage() {
               <div>
                 <Input
                   type="file"
-                  accept="image/*"
+                  accept="image/jpeg,image/png,image/gif,image/webp"
                   onChange={(e) => e.target.files?.[0] && handleAvatarUpload(e.target.files[0])}
                   className="mb-2"
                 />
-                <p className="text-xs text-gray-500">JPG, PNG up to 5MB</p>
+                <p className="text-xs text-gray-500">JPG, PNG, GIF, or WebP up to your configured media limit.</p>
               </div>
             </div>
           </div>
@@ -202,3 +213,4 @@ export default function AuthorSettingsPage() {
     </div>
   )
 }
+

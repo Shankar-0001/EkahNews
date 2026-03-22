@@ -1,7 +1,10 @@
+import { cookies } from 'next/headers'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { apiResponse } from '@/lib/api-utils'
 
 const toNumber = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
+const COOKIE_TTL_SECONDS = 60 * 60 * 12
 
 async function getMetrics(supabase, articleId) {
   const { data } = await supabase
@@ -60,7 +63,17 @@ export async function POST(request) {
       return apiResponse(400, null, 'Invalid action')
     }
 
+    const cookieStore = cookies()
+    const cookieName = `engagement:${type}:${action}:${entityId}`
     const supabase = await createClient()
+
+    if (cookieStore.get(cookieName)?.value === '1') {
+      const metrics = type === 'story'
+        ? await getStoryMetrics(supabase, entityId)
+        : await getMetrics(supabase, entityId)
+      return apiResponse(200, { metrics, deduped: true }, null)
+    }
+
     const current = type === 'story'
       ? await getStoryMetrics(supabase, entityId)
       : await getMetrics(supabase, entityId)
@@ -72,7 +85,8 @@ export async function POST(request) {
 
     const table = type === 'story' ? 'web_story_engagement' : 'article_engagement'
     const idField = type === 'story' ? 'story_id' : 'article_id'
-    const { error } = await supabase
+    const admin = createAdminClient()
+    const { error } = await admin
       .from(table)
       .upsert(
         {
@@ -84,6 +98,15 @@ export async function POST(request) {
       )
 
     if (error) return apiResponse(500, null, error.message)
+
+    cookieStore.set(cookieName, '1', {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: COOKIE_TTL_SECONDS,
+      path: '/',
+    })
+
     return apiResponse(200, { metrics: next }, null)
   } catch (error) {
     return apiResponse(500, null, error.message || 'Failed to update engagement')

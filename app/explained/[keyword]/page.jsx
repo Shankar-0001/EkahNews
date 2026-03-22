@@ -2,7 +2,7 @@ import { createClient as createPublicClient } from '@supabase/supabase-js'
 import PublicHeader from '@/components/layout/PublicHeader'
 import StructuredData from '@/components/seo/StructuredData'
 import ArticleMiniCard from '@/components/content/ArticleMiniCard'
-import { absoluteUrl, buildLanguageAlternates, slugFromText } from '@/lib/site-config'
+import { absoluteUrl, buildLanguageAlternates, getPublicationLogoUrl, slugFromText } from '@/lib/site-config'
 import { notFound, permanentRedirect } from 'next/navigation'
 import { stripHtml } from '@/lib/content-utils'
 import Link from 'next/link'
@@ -58,12 +58,12 @@ export async function generateMetadata({ params }) {
       .from('articles')
       .select('id', { count: 'exact', head: true })
       .eq('status', 'published')
-      .or(`title.ilike.${pattern},excerpt.ilike.${pattern},content.ilike.${pattern}`)
+      .or(`title.ilike.${pattern},excerpt.ilike.${pattern}`)
     matchCount = count || 0
   }
 
   const url = absoluteUrl(`/explained/${normalized}`)
-  const ogImage = absoluteUrl('/logo.png')
+  const ogImage = getPublicationLogoUrl()
   return {
     title: `${keyword} Explained | EkahNews`,
     description: `Simple explainers and latest context for ${keyword}, with linked source articles.`,
@@ -129,7 +129,7 @@ export default async function ExplainedKeywordPage({ params }) {
     .limit(MAX_ARTICLES)
 
   if (pattern) {
-    articlesQuery.or(`title.ilike.${pattern},excerpt.ilike.${pattern},content.ilike.${pattern}`)
+    articlesQuery.or(`title.ilike.${pattern},excerpt.ilike.${pattern}`)
   }
 
   const [{ data: categories }, { data: articles }, { data: engagementRows }] = await Promise.all([
@@ -188,4 +188,6 @@ export default async function ExplainedKeywordPage({ params }) {
     </div>
   )
 }
+
+
 

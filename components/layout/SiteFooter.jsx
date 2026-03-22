@@ -1,7 +1,27 @@
+'use client'
+
 import Link from 'next/link'
 import { ArrowRight, Facebook, Instagram, Youtube, Linkedin, Mail, Sparkles } from 'lucide-react'
+import { usePathname } from 'next/navigation'
+import { getPublicationSocialProfiles } from '@/lib/site-config'
 
 export default function SiteFooter() {
+  const pathname = usePathname() || ''
+  const isAmpStoryPath = pathname.startsWith('/web-stories/') && pathname !== '/web-stories'
+
+  if (isAmpStoryPath) {
+    return null
+  }
+
+  const socialLinks = {
+    facebook: process.env.NEXT_PUBLIC_FACEBOOK_URL,
+    twitter: process.env.NEXT_PUBLIC_TWITTER_URL,
+    instagram: process.env.NEXT_PUBLIC_INSTAGRAM_URL,
+    youtube: process.env.NEXT_PUBLIC_YOUTUBE_URL,
+    linkedin: process.env.NEXT_PUBLIC_LINKEDIN_URL,
+  }
+  const hasSocialLinks = getPublicationSocialProfiles().length > 0
+
   return (
     <footer className="mt-16 border-t border-slate-200 bg-[linear-gradient(180deg,_#0f172a_0%,_#020617_100%)] text-white dark:bg-black">
       <div className="w-full max-w-6xl mx-auto px-4 py-12">
@@ -27,25 +47,26 @@ export default function SiteFooter() {
                 <Sparkles className="h-4 w-4" />
                 <p className="text-xs font-semibold uppercase tracking-[0.24em]">Newsletter</p>
               </div>
-              <p className="text-sm text-slate-300 mb-4">Get a compact weekly brief with the biggest stories and explainers.</p>
+              <p className="text-sm text-slate-300 mb-4">Newsletter signup is coming soon. For now, reach out through our contact page for updates.</p>
               <div className="flex flex-col sm:flex-row items-stretch gap-2">
                 <div className="relative flex-1">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <input
                     type="email"
                     placeholder="you@example.com"
-                    className="w-full rounded-full bg-white/95 text-slate-900 placeholder:text-slate-500 border border-white/30 pl-9 pr-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled
+                    className="w-full rounded-full bg-white/70 text-slate-900 placeholder:text-slate-500 border border-white/30 pl-9 pr-3 py-3 text-sm cursor-not-allowed"
                   />
                 </div>
-                <button
-                  type="button"
+                <Link
+                  href="/contact"
                   className="inline-flex items-center justify-center gap-2 rounded-full bg-blue-600 px-4 py-3 text-sm font-semibold hover:bg-blue-700"
                 >
-                  Subscribe
+                  Contact Us
                   <ArrowRight className="h-4 w-4" />
-                </button>
+                </Link>
               </div>
-              <p className="text-xs text-slate-500 mt-3">Optional: weekly highlights only.</p>
+              <p className="text-xs text-slate-500 mt-3"></p>
             </div>
           </div>
         </div>
@@ -80,11 +101,15 @@ export default function SiteFooter() {
 
           <div>
             <h4 className="font-semibold mb-3">Follow Us</h4>
-            <div className="flex items-center gap-3">
-              <Link href="https://facebook.com" aria-label="Facebook" className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#1877F2] text-white shadow-sm transition-opacity hover:opacity-90">
+            {hasSocialLinks ? (
+              <div className="flex items-center gap-3">
+              {socialLinks.facebook && (
+              <Link href={socialLinks.facebook} aria-label="Facebook" className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#1877F2] text-white shadow-sm transition-opacity hover:opacity-90">
                 <Facebook className="h-5 w-5" />
               </Link>
-              <Link href="https://twitter.com" aria-label="X" className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-black text-white shadow-sm transition-opacity hover:opacity-90">
+              )}
+              {socialLinks.twitter && (
+              <Link href={socialLinks.twitter} aria-label="X" className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-black text-white shadow-sm transition-opacity hover:opacity-90">
                 <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true" focusable="false">
                   <path
                     fill="currentColor"
@@ -92,16 +117,28 @@ export default function SiteFooter() {
                   />
                 </svg>
               </Link>
-              <Link href="https://instagram.com" aria-label="Instagram" className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-tr from-[#f58529] via-[#dd2a7b] to-[#515bd4] text-white shadow-sm transition-opacity hover:opacity-90">
+              )}
+              {socialLinks.instagram && (
+              <Link href={socialLinks.instagram} aria-label="Instagram" className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-tr from-[#f58529] via-[#dd2a7b] to-[#515bd4] text-white shadow-sm transition-opacity hover:opacity-90">
                 <Instagram className="h-5 w-5" />
               </Link>
-              <Link href="https://youtube.com" aria-label="YouTube" className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#FF0000] text-white shadow-sm transition-opacity hover:opacity-90">
+              )}
+              {socialLinks.youtube && (
+              <Link href={socialLinks.youtube} aria-label="YouTube" className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#FF0000] text-white shadow-sm transition-opacity hover:opacity-90">
                 <Youtube className="h-5 w-5" />
               </Link>
-              <Link href="https://linkedin.com" aria-label="LinkedIn" className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#0A66C2] text-white shadow-sm transition-opacity hover:opacity-90">
+              )}
+              {socialLinks.linkedin && (
+              <Link href={socialLinks.linkedin} aria-label="LinkedIn" className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#0A66C2] text-white shadow-sm transition-opacity hover:opacity-90">
                 <Linkedin className="h-5 w-5" />
               </Link>
-            </div>
+              )}
+              </div>
+            ) : (
+              <p className="text-sm text-slate-400 leading-6">
+                Official social profiles will appear here once they are configured.
+              </p>
+            )}
           </div>
         </div>
 
@@ -112,4 +149,3 @@ export default function SiteFooter() {
     </footer>
   )
 }
-

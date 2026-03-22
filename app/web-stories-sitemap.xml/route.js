@@ -6,23 +6,17 @@ export async function GET() {
   const supabase = await createClient()
   const { data: stories } = await supabase
     .from('web_stories')
-    .select('slug, updated_at, created_at')
-    .order('created_at', { ascending: false })
-    .limit(1000)
+    .select('slug, published_at, updated_at')
+    .eq('status', 'published')
+    .order('published_at', { ascending: false })
+    .limit(5000)
 
   const entries = (stories || []).map((story) => ({
     loc: absoluteUrl(`/web-stories/${story.slug}`),
-    lastmod: new Date(story.updated_at || story.created_at).toISOString(),
-    changefreq: 'weekly',
-    priority: 0.7,
-  }))
-
-  entries.unshift({
-    loc: absoluteUrl('/web-stories'),
-    lastmod: new Date().toISOString(),
+    lastmod: new Date(story.updated_at || story.published_at || Date.now()).toISOString(),
     changefreq: 'daily',
-    priority: 0.7,
-  })
+    priority: 0.6,
+  }))
 
   return xmlResponse(urlsetXml(entries))
 }

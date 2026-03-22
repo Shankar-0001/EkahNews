@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/hooks/use-toast'
@@ -8,10 +9,10 @@ import {
   validateImageFile,
   compressImage,
   generateStoragePath,
-  formatFileSize,
   getImageDimensions,
 } from '@/lib/image-utils'
-import TipTapEditor from '@/components/editor/TipTapEditor'
+import { formatFileSize } from '@/lib/image-utils'
+import SafeHtml from '@/components/SafeHtml'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -30,6 +31,16 @@ import {
 import { Eye, Save, Send, CheckCircle, AlertTriangle } from 'lucide-react'
 import slugify from 'slugify'
 
+const TipTapEditor = dynamic(() => import('@/components/editor/TipTapEditor'), {
+  ssr: false,
+  loading: () => <p className="text-sm text-gray-500">Loading editor...</p>,
+})
+
+const WebStoryEditor = dynamic(() => import('@/components/dashboard/WebStoryEditor'), {
+  ssr: false,
+  loading: () => <p className="text-sm text-gray-500">Loading story editor...</p>,
+})
+
 export default function ArticleEditorPage() {
   const router = useRouter()
   const supabase = createClient()
@@ -42,6 +53,7 @@ export default function ArticleEditorPage() {
   const [selectedAuthorId, setSelectedAuthorId] = useState('')
   const [showPreview, setShowPreview] = useState(false)
   const [error, setError] = useState(null)
+  const [contentType, setContentType] = useState('news')
 
   // Form state
   const [title, setTitle] = useState('')
@@ -54,8 +66,13 @@ export default function ArticleEditorPage() {
   const [featuredImageAlt, setFeaturedImageAlt] = useState('')
   const [seoTitle, setSeoTitle] = useState('')
   const [seoDescription, setSeoDescription] = useState('')
+  const [canonicalUrl, setCanonicalUrl] = useState('')
+  const [schemaType, setSchemaType] = useState('NewsArticle')
+  const [structuredData, setStructuredData] = useState('')
   const [keywords, setKeywords] = useState([])
   const [status, setStatus] = useState('published')
+  const [publishDate, setPublishDate] = useState('')
+  const [updatedDate, setUpdatedDate] = useState('')
 
   // Options
   const [categories, setCategories] = useState([])
@@ -66,6 +83,23 @@ export default function ArticleEditorPage() {
   useEffect(() => {
     loadUserAndData()
   }, [])
+
+  useEffect(() => {
+    if (contentType === 'article') {
+      setSchemaType('BlogPosting')
+      if (status === 'archived') {
+        setStatus('draft')
+      }
+      return
+    }
+
+    if (contentType === 'news') {
+      setSchemaType('NewsArticle')
+      return
+    }
+
+    setShowPreview(false)
+  }, [contentType, status])
 
   const loadUserAndData = async () => {
     try {
@@ -137,6 +171,12 @@ export default function ArticleEditorPage() {
     if (!slug || slug === slugify((title || ''), { lower: true, strict: true })) {
       setSlug(slugify(newTitle, { lower: true, strict: true }))
     }
+  }
+
+  const toIsoDateTime = (value) => {
+    if (!value) return null
+    const parsed = new Date(value)
+    return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString()
   }
 
   const handleImageUpload = async (file) => {
@@ -257,8 +297,14 @@ export default function ArticleEditorPage() {
     setLoading(true)
     setError(null)
 
+    let createdArticleId = null
+
     try {
       const finalStatus = userRole === 'author' ? 'pending' : newStatus
+      const normalizedPublishedAt = finalStatus === 'published'
+        ? (toIsoDateTime(publishDate) || new Date().toISOString())
+        : null
+      const normalizedUpdatedAt = toIsoDateTime(updatedDate) || new Date().toISOString()
       const articleData = {
         title: title.trim(),
         slug: slug || slugify(title, { lower: true, strict: true }),
@@ -270,13 +316,16 @@ export default function ArticleEditorPage() {
         featured_image_alt: featuredImageAlt?.trim() || null,
         seo_title: seoTitle || title,
         seo_description: seoDescription || excerpt,
+        canonical_url: canonicalUrl.trim() || null,
+        schema_type: schemaType,
+        structured_data: structuredData.trim() || null,
         keywords,
         status: finalStatus,
-        published_at: finalStatus === 'published' ? new Date().toISOString() : null,
+        published_at: normalizedPublishedAt,
+        updated_at: normalizedUpdatedAt,
         author_id: selectedAuthorId || authorId,
       }
 
-      // Call server API to create article
       const response = await fetch('/api/articles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -290,8 +339,8 @@ export default function ArticleEditorPage() {
       }
 
       const article = result?.data?.article
+      createdArticleId = article?.id || null
 
-      // Handle tags
       if (selectedTags.length > 0 && article?.id) {
         const tagRelations = selectedTags.map(tagId => ({
           article_id: article.id,
@@ -305,7 +354,8 @@ export default function ArticleEditorPage() {
         })
 
         if (!tagsResponse.ok) {
-          console.warn('Failed to attach tags')
+          const tagsPayload = await tagsResponse.json().catch(() => ({}))
+          throw new Error(tagsPayload?.error || 'Article created, but selected tags could not be saved')
         }
       }
 
@@ -313,6 +363,7 @@ export default function ArticleEditorPage() {
         draft: 'Article saved as draft',
         pending: 'Article submitted for review',
         published: 'Article published successfully',
+        archived: 'Article archived successfully',
       }
 
       toast({
@@ -329,6 +380,10 @@ export default function ArticleEditorPage() {
         title: 'Error',
         description: err.message || 'Failed to save article',
       })
+      if (createdArticleId) {
+        router.push(`/dashboard/articles/${createdArticleId}/edit`)
+      }
+    } finally {
       setLoading(false)
     }
   }
@@ -369,6 +424,39 @@ export default function ArticleEditorPage() {
 
   const selectedCategory = categories.find((cat) => cat.id === categoryId)
   const previewCategorySlug = selectedCategory?.slug || 'news'
+  const contentLabels = {
+    article: {
+      name: 'Article',
+      description: 'Long-form or evergreen content with the standard writing editor.',
+      action: 'Write and publish an article',
+      title: 'Article Title',
+      slug: 'article-slug',
+      excerpt: 'Brief summary of the article...',
+      content: 'Content',
+      preview: 'Article Preview',
+    },
+    news: {
+      name: 'News',
+      description: 'Fast news publishing with the same SEO controls and lightweight workflow.',
+      action: 'Write and publish a news story',
+      title: 'News Title',
+      slug: 'news-story-slug',
+      excerpt: 'Brief summary of the news story...',
+      content: 'News Content',
+      preview: 'News Preview',
+    },
+    'web-story': {
+      name: 'Web Story',
+      description: 'Visual story workflow with slide-based publishing.',
+      action: 'Create a visual web story',
+      title: 'Web Story Title',
+      slug: 'web-story-slug',
+      excerpt: 'Short summary of the web story...',
+      content: 'Story Content',
+      preview: 'Story Preview',
+    },
+  }
+  const activeContent = contentLabels[contentType]
 
   if (initializing) {
     return (
@@ -397,35 +485,60 @@ export default function ArticleEditorPage() {
     <div className="max-w-6xl mx-auto space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Create New Article</h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-2">Write and publish your article</p>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Create New Content</h1>
+        <p className="text-gray-600 dark:text-gray-400 mt-2">{activeContent.action}</p>
       </div>
 
       <div className="space-y-6">
-        {/* Title */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Article Title</CardTitle>
+            <CardTitle className="text-lg">Content Type</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Select value={contentType} onValueChange={setContentType}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="article">Article</SelectItem>
+                <SelectItem value="news">News</SelectItem>
+                <SelectItem value="web-story">Web Story</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {activeContent.description}
+            </p>
+          </CardContent>
+        </Card>
+
+        {contentType === 'web-story' ? (
+          <WebStoryEditor mode="create" />
+        ) : (
+          <>
+            {/* Title */}
+            <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">{activeContent.title}</CardTitle>
           </CardHeader>
           <CardContent>
             <Input
-              placeholder="Enter article title..."
+              placeholder={`Enter ${activeContent.name.toLowerCase()} title...`}
               value={title}
               onChange={(e) => handleTitleChange(e.target.value)}
               className="text-lg"
             />
           </CardContent>
-        </Card>
+            </Card>
 
         {/* Slug */}
-        <Card>
+            <Card>
           <CardHeader>
             <CardTitle className="text-lg">URL Slug</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
               <Input
-                placeholder="article-url-slug"
+                placeholder={activeContent.slug}
                 value={slug}
                 onChange={(e) => setSlug(slugify(e.target.value, { lower: true, strict: true }))}
               />
@@ -434,27 +547,27 @@ export default function ArticleEditorPage() {
               </p>
             </div>
           </CardContent>
-        </Card>
+            </Card>
 
         {/* Excerpt */}
-        <Card>
+            <Card>
           <CardHeader>
             <CardTitle className="text-lg">Excerpt</CardTitle>
           </CardHeader>
           <CardContent>
             <Textarea
-              placeholder="Brief description of the article..."
+              placeholder={activeContent.excerpt}
               value={excerpt}
               onChange={(e) => setExcerpt(e.target.value)}
               rows={3}
               className="resize-none"
             />
           </CardContent>
-        </Card>
+            </Card>
 
         {/* Category and Author */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card>
             <CardHeader>
               <CardTitle className="text-lg">Category</CardTitle>
             </CardHeader>
@@ -473,9 +586,9 @@ export default function ArticleEditorPage() {
                 </SelectContent>
               </Select>
             </CardContent>
-          </Card>
+              </Card>
 
-          <Card>
+              <Card>
             <CardHeader>
               <CardTitle className="text-lg">Author</CardTitle>
             </CardHeader>
@@ -493,11 +606,11 @@ export default function ArticleEditorPage() {
                 </SelectContent>
               </Select>
             </CardContent>
-          </Card>
-        </div>
+              </Card>
+            </div>
 
         {/* Featured Image */}
-        <Card>
+            <Card>
           <CardHeader>
             <CardTitle className="text-lg">Featured Image</CardTitle>
           </CardHeader>
@@ -527,39 +640,44 @@ export default function ArticleEditorPage() {
               />
             </div>
           </CardContent>
-        </Card>
+            </Card>
 
         {/* Featured Image Preview */}
-        {featuredImage && (
-          <Card>
-            <CardContent className="pt-6">
-              <div className="relative w-full h-48 rounded-lg overflow-hidden border">
-                <img
-                  src={featuredImage}
-                  alt={featuredImageAlt || title || 'Featured image'}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            </CardContent>
-          </Card>
-        )}
+            {featuredImage && (
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="relative w-full h-48 rounded-lg overflow-hidden border">
+                    <img
+                      src={featuredImage}
+                      alt={featuredImageAlt || title || 'Featured image'}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
         {/* Tags */}
-        <Card>
+            <Card>
           <CardHeader>
             <CardTitle className="text-lg">Tags</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex gap-2 mb-4">
-              <Input
-                value={newTagName}
-                onChange={(e) => setNewTagName(e.target.value)}
-                placeholder="Create new tag"
-              />
-              <Button type="button" variant="outline" onClick={createTag}>
-                Add
-              </Button>
-            </div>
+            {userRole === 'admin' && (
+              <div className="flex gap-2 mb-4">
+                <Input
+                  value={newTagName}
+                  onChange={(e) => setNewTagName(e.target.value)}
+                  placeholder="Create new tag"
+                />
+                <Button type="button" variant="outline" onClick={createTag}>
+                  Add
+                </Button>
+              </div>
+            )}
+            {userRole !== 'admin' && (
+              <p className="mb-4 text-sm text-gray-500">Authors can apply existing tags but cannot create new taxonomy.</p>
+            )}
             <div className="flex flex-wrap gap-2">
               {tags.length > 0 ? (
                 tags.map(tag => (
@@ -577,12 +695,12 @@ export default function ArticleEditorPage() {
               )}
             </div>
           </CardContent>
-        </Card>
+            </Card>
 
         {/* Content Editor */}
-        <Card>
+            <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Content</CardTitle>
+            <CardTitle className="text-lg">{activeContent.content}</CardTitle>
           </CardHeader>
           <CardContent>
             <TipTapEditor
@@ -591,10 +709,10 @@ export default function ArticleEditorPage() {
               onImageUpload={handleImageUpload}
             />
           </CardContent>
-        </Card>
+            </Card>
 
         {/* SEO Fields */}
-        <Card>
+            <Card>
           <CardHeader>
             <CardTitle className="text-lg">SEO Settings</CardTitle>
           </CardHeader>
@@ -623,98 +741,164 @@ export default function ArticleEditorPage() {
                 {seoDescription.length}/160 characters
               </p>
             </div>
+            <div>
+              <Label>Canonical URL</Label>
+              <Input
+                placeholder="https://ekahnews.com/category/article-slug"
+                value={canonicalUrl}
+                onChange={(e) => setCanonicalUrl(e.target.value)}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Leave blank to use the article URL automatically. Only production-domain canonicals are allowed.
+              </p>
+            </div>
+            <div>
+              <Label>Primary Schema Type</Label>
+              <Select value={schemaType} onValueChange={setSchemaType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="NewsArticle">NewsArticle</SelectItem>
+                  <SelectItem value="BlogPosting">BlogPosting</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Structured Data Override (JSON)</Label>
+              <Textarea
+                placeholder='{"@context":"https://schema.org","@type":"NewsArticle"}'
+                value={structuredData}
+                onChange={(e) => setStructuredData(e.target.value)}
+                rows={6}
+                className="font-mono text-sm"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Optional. If provided, this JSON replaces the generated primary article schema.
+              </p>
+            </div>
             <KeywordInput
               value={keywords}
               onChange={setKeywords}
             />
           </CardContent>
-        </Card>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Publishing Controls</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <Label>Publish Date</Label>
+                  <Input
+                    type="datetime-local"
+                    value={publishDate}
+                    onChange={(e) => setPublishDate(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label>Updated Date</Label>
+                  <Input
+                    type="datetime-local"
+                    value={updatedDate}
+                    onChange={(e) => setUpdatedDate(e.target.value)}
+                  />
+                </div>
+              </CardContent>
+            </Card>
 
         {/* Status (Admin only) */}
-        {userRole === 'admin' && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Status</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="pending">Pending Review</SelectItem>
-                  <SelectItem value="published">Published</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-gray-500 mt-2">
-                {status === 'published' ? 'This article will be immediately published' : 'This article will not be publicly visible'}
-              </p>
-            </CardContent>
-          </Card>
-        )}
+            {userRole === 'admin' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Status</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Select value={status} onValueChange={setStatus}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="draft">Draft</SelectItem>
+                      <SelectItem value="pending">Pending Review</SelectItem>
+                      <SelectItem value="published">Published</SelectItem>
+                      <SelectItem value="archived">Archived</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-gray-500 mt-2">
+                    {status === 'published' ? 'This content will be immediately published' : 'This content will not be publicly visible'}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
 
         {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row justify-end gap-3 sticky bottom-4 bg-white dark:bg-gray-900 p-4 rounded-lg border border-gray-200 dark:border-gray-800 shadow-lg">
-          <Button
-            variant="outline"
-            onClick={() => setShowPreview(true)}
-            disabled={loading || !title || !content.html}
-          >
-            <Eye className="mr-2 h-4 w-4" />
-            Preview
-          </Button>
-
-          {userRole === 'admin' && (
-            <>
+            <div className="flex flex-col sm:flex-row justify-end gap-3 sticky bottom-4 bg-white dark:bg-gray-900 p-4 rounded-lg border border-gray-200 dark:border-gray-800 shadow-lg">
               <Button
                 variant="outline"
-                onClick={() => savArticle('draft')}
-                disabled={loading}
+                onClick={() => setShowPreview(true)}
+                disabled={loading || !title || !content.html}
               >
-                <Save className="mr-2 h-4 w-4" />
-                Save Draft
+                <Eye className="mr-2 h-4 w-4" />
+                Preview
               </Button>
+
+              {userRole === 'admin' && (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => savArticle('draft')}
+                    disabled={loading}
+                  >
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Draft
+                  </Button>
+                  <Button
+                    onClick={() => savArticle('pending')}
+                    disabled={loading}
+                  >
+                    <Send className="mr-2 h-4 w-4" />
+                    Submit for Review
+                  </Button>
+                </>
+              )}
+
               <Button
-                onClick={() => savArticle('pending')}
+                onClick={() => savArticle('published')}
                 disabled={loading}
+                className="bg-blue-600 hover:bg-blue-700"
               >
-                <Send className="mr-2 h-4 w-4" />
-                Submit for Review
+                <CheckCircle className="mr-2 h-4 w-4" />
+                {loading ? 'Saving...' : userRole === 'author' ? 'Submit For Review' : 'Publish'}
               </Button>
-            </>
-          )}
+            </div>
 
-          <Button
-            onClick={() => savArticle('published')}
-            disabled={loading}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
-            <CheckCircle className="mr-2 h-4 w-4" />
-            {loading ? 'Publishing...' : userRole === 'author' ? 'Publish Article' : 'Publish'}
-          </Button>
-        </div>
+            {/* Preview Dialog */}
+            <Dialog open={showPreview} onOpenChange={setShowPreview}>
+              <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>{activeContent.preview}</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  {featuredImage && (
+                    <img src={featuredImage} alt={title} className="w-full h-64 object-cover rounded-lg" />
+                  )}
+                  <h1 className="text-4xl font-bold text-gray-900 dark:text-white">{title}</h1>
+                  <p className="text-xl text-gray-600 dark:text-gray-400">{excerpt}</p>
+                  <SafeHtml
+                    html={content.html}
+                    className="prose dark:prose-invert max-w-none"
+                    baseUrl={process.env.NEXT_PUBLIC_BASE_URL || 'https://ekahnews.com'}
+                  />
+                </div>
+              </DialogContent>
+            </Dialog>
+          </>
+        )}
       </div>
-
-      {/* Preview Dialog */}
-      <Dialog open={showPreview} onOpenChange={setShowPreview}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Article Preview</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            {featuredImage && (
-              <img src={featuredImage} alt={title} className="w-full h-64 object-cover rounded-lg" />
-            )}
-            <h1 className="text-4xl font-bold text-gray-900 dark:text-white">{title}</h1>
-            <p className="text-xl text-gray-600 dark:text-gray-400">{excerpt}</p>
-            <div
-              className="prose dark:prose-invert max-w-none"
-              dangerouslySetInnerHTML={{ __html: content.html }}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
+
+

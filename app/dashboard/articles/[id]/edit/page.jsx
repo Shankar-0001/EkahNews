@@ -12,6 +12,7 @@ import {
     getImageDimensions,
 } from '@/lib/image-utils'
 import TipTapEditor from '@/components/editor/TipTapEditor'
+import SafeHtml from '@/components/SafeHtml'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -62,8 +63,13 @@ export default function EditArticlePage() {
     const [featuredImageAlt, setFeaturedImageAlt] = useState('')
     const [seoTitle, setSeoTitle] = useState('')
     const [seoDescription, setSeoDescription] = useState('')
+    const [canonicalUrl, setCanonicalUrl] = useState('')
+    const [schemaType, setSchemaType] = useState('NewsArticle')
+    const [structuredData, setStructuredData] = useState('')
     const [keywords, setKeywords] = useState([])
     const [status, setStatus] = useState('published')
+    const [publishDate, setPublishDate] = useState('')
+    const [updatedDate, setUpdatedDate] = useState('')
 
     // Options
     const [categories, setCategories] = useState([])
@@ -136,8 +142,13 @@ export default function EditArticlePage() {
             setFeaturedImageAlt(articleData.featured_image_alt || '')
             setSeoTitle(articleData.seo_title || '')
             setSeoDescription(articleData.seo_description || '')
+            setCanonicalUrl(articleData.canonical_url || '')
+            setSchemaType(articleData.schema_type || 'NewsArticle')
+            setStructuredData(articleData.structured_data ? JSON.stringify(articleData.structured_data, null, 2) : '')
             setKeywords(articleData.keywords || [])
             setStatus(articleData.status || 'published')
+            setPublishDate(articleData.published_at ? new Date(articleData.published_at).toISOString().slice(0, 16) : '')
+            setUpdatedDate(articleData.updated_at ? new Date(articleData.updated_at).toISOString().slice(0, 16) : '')
 
             if (articleData.article_tags) {
                 setSelectedTags(articleData.article_tags.map(at => at.tag_id))
@@ -180,6 +191,12 @@ export default function EditArticlePage() {
         if (!slug || slug === slugify(article?.title || '', { lower: true, strict: true })) {
             setSlug(slugify(newTitle, { lower: true, strict: true }))
         }
+    }
+
+    const toIsoDateTime = (value) => {
+        if (!value) return null
+        const parsed = new Date(value)
+        return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString()
     }
 
     const handleImageUpload = (file) => {
@@ -304,6 +321,10 @@ export default function EditArticlePage() {
             // Authors should not bypass editorial workflow during edits
             const finalStatus = userRole === 'author' ? (article?.status || newStatus) : newStatus
             const existingPublishedAt = article?.published_at || null
+            const normalizedPublishedAt = finalStatus === 'published'
+                ? (toIsoDateTime(publishDate) || existingPublishedAt || new Date().toISOString())
+                : null
+            const normalizedUpdatedAt = toIsoDateTime(updatedDate) || new Date().toISOString()
 
             const articleData = {
                 title: title.trim(),
@@ -316,11 +337,13 @@ export default function EditArticlePage() {
                 featured_image_alt: featuredImageAlt?.trim() || null,
                 seo_title: seoTitle || title,
                 seo_description: seoDescription || excerpt,
+                canonical_url: canonicalUrl.trim() || null,
+                schema_type: schemaType,
+                structured_data: structuredData.trim() || null,
                 keywords,
                 status: finalStatus,
-                published_at: finalStatus === 'published'
-                    ? (existingPublishedAt || new Date().toISOString())
-                    : existingPublishedAt,
+                published_at: normalizedPublishedAt,
+                updated_at: normalizedUpdatedAt,
                 author_id: selectedAuthorId || authorId,
             }
 
@@ -337,19 +360,25 @@ export default function EditArticlePage() {
                 throw new Error(result.error || 'Failed to update article')
             }
 
-            // Handle tags
-            if (selectedTags.length > 0) {
-                // Delete old tags
-                await fetch(`/api/articles/${params.id}/tags`, { method: 'DELETE' })
+            const deleteTagsResponse = await fetch(`/api/articles/${params.id}/tags`, { method: 'DELETE' })
+            if (!deleteTagsResponse.ok) {
+                const deletePayload = await deleteTagsResponse.json().catch(() => ({}))
+                throw new Error(deletePayload?.error || 'Failed to clear existing tags')
+            }
 
-                // Add new tags
-                await fetch('/api/articles/tags', {
+            if (selectedTags.length > 0) {
+                const addTagsResponse = await fetch('/api/articles/tags', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(
                         selectedTags.map(tagId => ({ article_id: params.id, tag_id: tagId }))
                     ),
                 })
+
+                if (!addTagsResponse.ok) {
+                    const addPayload = await addTagsResponse.json().catch(() => ({}))
+                    throw new Error(addPayload?.error || 'Failed to save selected tags')
+                }
             }
 
             toast({
@@ -397,6 +426,7 @@ export default function EditArticlePage() {
                 title: 'Error',
                 description: err.message || 'Failed to delete article',
             })
+        } finally {
             setSaving(false)
         }
     }
@@ -602,16 +632,21 @@ export default function EditArticlePage() {
                         <CardTitle className="text-lg">Tags</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="flex gap-2 mb-4">
-                            <Input
-                                value={newTagName}
-                                onChange={(e) => setNewTagName(e.target.value)}
-                                placeholder="Create new tag"
-                            />
-                            <Button type="button" variant="outline" onClick={createTag}>
-                                Add
-                            </Button>
-                        </div>
+                        {userRole === 'admin' && (
+                            <div className="flex gap-2 mb-4">
+                                <Input
+                                    value={newTagName}
+                                    onChange={(e) => setNewTagName(e.target.value)}
+                                    placeholder="Create new tag"
+                                />
+                                <Button type="button" variant="outline" onClick={createTag}>
+                                    Add
+                                </Button>
+                            </div>
+                        )}
+                        {userRole !== 'admin' && (
+                            <p className="mb-4 text-sm text-gray-500">Authors can apply existing tags but cannot create new taxonomy.</p>
+                        )}
                         <div className="flex flex-wrap gap-2">
                             {tags.length > 0 ? (
                                 tags.map(tag => (
@@ -675,10 +710,64 @@ export default function EditArticlePage() {
                                 {seoDescription.length}/160 characters
                             </p>
                         </div>
+                        <div>
+                            <Label>Canonical URL</Label>
+                            <Input
+                                placeholder="https://ekahnews.com/category/article-slug"
+                                value={canonicalUrl}
+                                onChange={(e) => setCanonicalUrl(e.target.value)}
+                            />
+                        </div>
+                        <div>
+                            <Label>Primary Schema Type</Label>
+                            <Select value={schemaType} onValueChange={setSchemaType}>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="NewsArticle">NewsArticle</SelectItem>
+                                    <SelectItem value="BlogPosting">BlogPosting</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div>
+                            <Label>Structured Data Override (JSON)</Label>
+                            <Textarea
+                                placeholder='{"@context":"https://schema.org","@type":"NewsArticle"}'
+                                value={structuredData}
+                                onChange={(e) => setStructuredData(e.target.value)}
+                                rows={6}
+                                className="font-mono text-sm"
+                            />
+                        </div>
                         <KeywordInput
                             value={keywords}
                             onChange={setKeywords}
                         />
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-lg">Publishing Controls</CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid gap-4 md:grid-cols-2">
+                        <div>
+                            <Label>Publish Date</Label>
+                            <Input
+                                type="datetime-local"
+                                value={publishDate}
+                                onChange={(e) => setPublishDate(e.target.value)}
+                            />
+                        </div>
+                        <div>
+                            <Label>Updated Date</Label>
+                            <Input
+                                type="datetime-local"
+                                value={updatedDate}
+                                onChange={(e) => setUpdatedDate(e.target.value)}
+                            />
+                        </div>
                     </CardContent>
                 </Card>
 
@@ -762,3 +851,11 @@ export default function EditArticlePage() {
         </div>
     )
 }
+
+
+
+
+
+
+
+

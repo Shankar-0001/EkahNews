@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import SafeHtml from '@/components/SafeHtml'
 import PublicHeader from '@/components/layout/PublicHeader'
 import { getRenderableHtml, getStaticPageDefinition, getStaticPageOverride } from '@/lib/static-pages'
 
@@ -29,9 +30,9 @@ export default async function TermsPage() {
       <main className="w-full max-w-6xl mx-auto px-4 py-10">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{pageTitle}</h1>
         {contentHtml ? (
-          <div
+          <SafeHtml
+            html={contentHtml}
             className="mt-6 prose prose-slate dark:prose-invert max-w-none"
-            dangerouslySetInnerHTML={{ __html: contentHtml }}
           />
         ) : (
           <div className="mt-6 space-y-4 text-gray-700 dark:text-gray-300">

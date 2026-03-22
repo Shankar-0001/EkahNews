@@ -16,9 +16,10 @@ import ReadingProgressBar from '@/components/article/ReadingProgressBar'
 import StickyShareBar from '@/components/article/StickyShareBar'
 import ArticleSummaryToggles from '@/components/article/ArticleSummaryToggles'
 import ArticleMiniCard from '@/components/content/ArticleMiniCard'
-import { applyLinkPolicyToHtml } from '@/lib/link-policy'
-import { buildLanguageAlternates, slugFromText } from '@/lib/site-config'
+import SafeHtml from '@/components/SafeHtml'
+import { buildLanguageAlternates, getArticleCanonicalUrl, slugFromText } from '@/lib/site-config'
 import { buildArticleKeywords, keywordsToMetadataValue, keywordsToTopicLinks } from '@/lib/keywords'
+import { parseStructuredDataOverride } from '@/lib/seo-utils'
 
 export const revalidate = 1800
 
@@ -58,6 +59,9 @@ export async function generateMetadata({ params }) {
         featured_image_url,
         featured_image_alt,
         keywords,
+        canonical_url,
+        schema_type,
+        structured_data,
         published_at,
         updated_at,
         status,
@@ -78,11 +82,11 @@ export async function generateMetadata({ params }) {
     }
 
     const siteUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://ekahnews.com'
-    const articleUrl = `${siteUrl}/${article.categories?.slug || 'news'}/${article.slug}`
+    const articleUrl = getArticleCanonicalUrl(article)
     const keywords = buildArticleKeywords(article)
-    const authorLinkSlug = article.authors?.id
+    const authorLinkSlug = article.authors?.slug
+      || article.authors?.id
       || article.author_id
-      || article.authors?.slug
       || slugFromText(article.authors?.name || '')
 
     return {
@@ -148,6 +152,9 @@ export default async function ArticlePage({ params }) {
         featured_image_url,
         featured_image_alt,
         keywords,
+        canonical_url,
+        schema_type,
+        structured_data,
         published_at,
         updated_at,
         status,
@@ -319,10 +326,10 @@ export default async function ArticlePage({ params }) {
       }
     }
 
-    const articleUrl = `${siteUrl}/${article.categories?.slug || 'news'}/${article.slug}`
-    const authorLinkSlug = authorProfile?.id
+    const articleUrl = getArticleCanonicalUrl(article)
+    const authorLinkSlug = authorProfile?.slug
+      || authorProfile?.id
       || article.author_id
-      || authorProfile?.slug
       || slugFromText(authorProfile?.name || article.authors?.name || '')
       || article.authors?.id
 
@@ -331,25 +338,12 @@ export default async function ArticlePage({ params }) {
     const aeoSnapshot = generateAeoSnapshot(article)
     const articleKeywords = buildArticleKeywords(article)
     const keywordTopicLinks = keywordsToTopicLinks(articleKeywords)
-    const articleContent = applyLinkPolicyToHtml(article.content || '', {
-      baseUrl: siteUrl,
-      nofollowExternal: true,
-    })
-    const faqItems = [
-      {
-        question: 'What is this article about?',
-        answer: article.excerpt || `This article covers ${article.title}.`,
-      },
-      {
-        question: 'How long does this article take to read?',
-        answer: `About ${readingTimeMinutes} minute${readingTimeMinutes > 1 ? 's' : ''}.`,
-      },
-    ]
+    const structuredOverride = parseStructuredDataOverride(article.structured_data)
     const schemas = generateArticleSchemas({
       article,
       articleUrl,
       readingTimeMinutes,
-      faqItems,
+      structuredOverride,
       breadcrumbs: [
         { name: 'Home', url: siteUrl },
         { name: article.categories?.name || 'News', url: `${siteUrl}/category/${article.categories?.slug || 'news'}` },
@@ -359,10 +353,8 @@ export default async function ArticlePage({ params }) {
 
     return (
       <>
-        <StructuredData data={schemas.newsArticle} />
-        <StructuredData data={schemas.blogPosting} />
+        <StructuredData data={schemas.primaryArticle} />
         <StructuredData data={schemas.breadcrumbList} />
-        <StructuredData data={schemas.faqPage} />
 
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
           <PublicHeader categories={categories || []} />
@@ -467,16 +459,17 @@ export default async function ArticlePage({ params }) {
                           alt={article.featured_image_alt || article.title}
                           fill
                           className="object-cover"
-                          loading="lazy"
+                          priority
                           sizes="(max-width: 768px) 100vw, 760px"
                         />
                       </div>
                     )}
 
                     <div className="space-y-6">
-                      <div
+                      <SafeHtml
+                        html={article.content || ''}
+                        baseUrl={siteUrl}
                         className="article-content prose prose-slate dark:prose-invert mb-8 max-w-none"
-                        dangerouslySetInnerHTML={{ __html: articleContent }}
                       />
                     </div>
 

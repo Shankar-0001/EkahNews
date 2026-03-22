@@ -1,5 +1,7 @@
+import { revalidatePath } from 'next/cache'
 import { apiResponse } from '@/lib/api-utils'
 import { requireAdmin } from '@/lib/auth-utils'
+import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 function getPaging(url) {
@@ -11,13 +13,22 @@ function getPaging(url) {
   return { page, limit, from, to }
 }
 
+function revalidateCategorySurface(slug) {
+  revalidatePath('/')
+  revalidatePath('/sitemap.xml')
+  revalidatePath('/category-sitemap.xml')
+  if (slug) {
+    revalidatePath(`/category/${slug}`)
+  }
+}
+
 export async function GET(request) {
   try {
     await requireAdmin()
-    const admin = createAdminClient()
+    const supabase = await createClient()
     const { page, limit, from, to } = getPaging(request.url)
 
-    const { data, count, error } = await admin
+    const { data, count, error } = await supabase
       .from('categories')
       .select('id, name, slug, description, created_at, updated_at', { count: 'exact' })
       .order('name')
@@ -60,6 +71,7 @@ export async function POST(request) {
       .single()
 
     if (error) return apiResponse(400, null, error.message)
+    revalidateCategorySurface(data.slug)
     return apiResponse(201, { category: data })
   } catch (error) {
     if (error.name === 'AuthError') {
@@ -76,13 +88,14 @@ export async function PATCH(request) {
     const admin = createAdminClient()
     const { id, name, slug, description } = await request.json()
 
-    if (!id) {
-      return apiResponse(400, null, 'Category ID is required')
-    }
+    if (!id) return apiResponse(400, null, 'Category ID is required')
+    if (!name || !slug) return apiResponse(400, null, 'Name and slug are required')
 
-    if (!name || !slug) {
-      return apiResponse(400, null, 'Name and slug are required')
-    }
+    const { data: existingCategory } = await admin
+      .from('categories')
+      .select('slug')
+      .eq('id', id)
+      .maybeSingle()
 
     const { data, error } = await admin
       .from('categories')
@@ -97,6 +110,8 @@ export async function PATCH(request) {
       .single()
 
     if (error) return apiResponse(400, null, error.message)
+    revalidateCategorySurface(existingCategory?.slug)
+    revalidateCategorySurface(data.slug)
     return apiResponse(200, { category: data })
   } catch (error) {
     if (error.name === 'AuthError') {
@@ -114,12 +129,19 @@ export async function DELETE(request) {
     const { id } = await request.json()
     if (!id) return apiResponse(400, null, 'Category ID is required')
 
+    const { data: existingCategory } = await admin
+      .from('categories')
+      .select('slug')
+      .eq('id', id)
+      .maybeSingle()
+
     const { error } = await admin
       .from('categories')
       .delete()
       .eq('id', id)
 
     if (error) return apiResponse(400, null, error.message)
+    revalidateCategorySurface(existingCategory?.slug)
     return apiResponse(200, { deleted: true })
   } catch (error) {
     if (error.name === 'AuthError') {

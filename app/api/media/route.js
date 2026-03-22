@@ -6,6 +6,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { apiResponse } from '@/lib/api-utils'
+import { requireAuth } from '@/lib/auth-utils'
 import { validateFileUpload, sanitizeFilename } from '@/lib/security-utils'
 
 const MEDIA_SELECT = 'id, filename, file_url, file_type, file_size, uploaded_by, created_at'
@@ -29,6 +30,7 @@ function deriveStoragePathFromUrl(fileUrl = '') {
  */
 export async function GET(request) {
     try {
+        const user = await requireAuth()
         const supabase = await createClient()
         const url = new URL(request.url)
         const page = Math.max(1, parseInt(url.searchParams.get('page') || '1'))
@@ -41,10 +43,14 @@ export async function GET(request) {
             .from('media_library')
             .select(MEDIA_SELECT, { count: 'exact' })
 
+        if (user.role !== 'admin') {
+            query = query.eq('uploaded_by', user.userId)
+        }
+
         // Filter by file type
         if (type) {
             const typeMap = {
-                image: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'],
+                image: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
                 video: ['video/mp4', 'video/webm', 'video/quicktime'],
                 audio: ['audio/mpeg', 'audio/wav', 'audio/ogg'],
                 document: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
@@ -80,6 +86,11 @@ export async function GET(request) {
             },
         })
     } catch (error) {
+        if (error.name === 'AuthError') {
+            return apiResponse(401, null, {
+                message: error.message,
+            })
+        }
         console.error('Media GET error:', error)
         return apiResponse(500, null, {
             message: 'Failed to fetch media',
@@ -121,7 +132,7 @@ export async function POST(request) {
         const uploadValidation = validateFileUpload(file, {
             maxSize: 50 * 1024 * 1024, // 50MB for media
             allowedTypes: [
-                'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
+                'image/jpeg', 'image/png', 'image/gif', 'image/webp',
                 'video/mp4', 'video/webm', 'video/quicktime',
                 'audio/mpeg', 'audio/wav', 'audio/ogg',
                 'application/pdf',

@@ -1,7 +1,10 @@
+import { cookies } from 'next/headers'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { apiResponse } from '@/lib/api-utils'
 
 const sanitizeNumber = (value) => (typeof value === 'number' && Number.isFinite(value) ? value : 0)
+const COOKIE_TTL_SECONDS = 60 * 60 * 12
 
 async function getCurrentMetrics(supabase, articleId) {
   const { data } = await supabase
@@ -32,13 +35,21 @@ export async function GET(_request, { params }) {
 
 export async function POST(request, { params }) {
   try {
-    const supabase = await createClient()
     const articleId = params?.id
     if (!articleId) return apiResponse(400, null, 'Article ID is required')
 
     const { action } = await request.json()
     if (!['view', 'like', 'share'].includes(action)) {
       return apiResponse(400, null, 'Invalid action')
+    }
+
+    const cookieStore = cookies()
+    const cookieName = `engagement:article:${action}:${articleId}`
+    const supabase = await createClient()
+
+    if (cookieStore.get(cookieName)?.value === '1') {
+      const metrics = await getCurrentMetrics(supabase, articleId)
+      return apiResponse(200, { metrics, deduped: true }, null)
     }
 
     const current = await getCurrentMetrics(supabase, articleId)
@@ -48,7 +59,8 @@ export async function POST(request, { params }) {
       shares: current.shares + (action === 'share' ? 1 : 0),
     }
 
-    const { error } = await supabase
+    const admin = createAdminClient()
+    const { error } = await admin
       .from('article_engagement')
       .upsert(
         {
@@ -60,6 +72,15 @@ export async function POST(request, { params }) {
       )
 
     if (error) return apiResponse(500, null, error.message)
+
+    cookieStore.set(cookieName, '1', {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: COOKIE_TTL_SECONDS,
+      path: '/',
+    })
+
     return apiResponse(200, { metrics: next }, null)
   } catch (error) {
     return apiResponse(500, null, error.message || 'Failed to update engagement')

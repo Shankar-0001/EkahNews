@@ -63,7 +63,7 @@ export async function generateMetadata({ params }) {
         .from('articles')
         .select('id', { count: 'exact', head: true })
         .eq('status', 'published')
-        .or(`title.ilike.${pattern},excerpt.ilike.${pattern},content.ilike.${pattern}`)
+        .or(`title.ilike.${pattern},excerpt.ilike.${pattern}`)
       : Promise.resolve({ count: 0 }),
   ])
 
@@ -154,7 +154,7 @@ export default async function TrendingKeywordPage({ params }) {
     .order('published_at', { ascending: false })
     .limit(MAX_ARTICLES)
 
-  articlesQuery.or(`title.ilike.${pattern},excerpt.ilike.${pattern},content.ilike.${pattern}`)
+  articlesQuery.or(`title.ilike.${pattern},excerpt.ilike.${pattern}`)
 
   const [
     { data: categories },
@@ -333,4 +333,5 @@ export default async function TrendingKeywordPage({ params }) {
     </div>
   )
 }
+
 

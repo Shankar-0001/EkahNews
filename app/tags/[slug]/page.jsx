@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import PublicHeader from '@/components/layout/PublicHeader'
 import ArticleMiniCard from '@/components/content/ArticleMiniCard'
 import StructuredData from '@/components/seo/StructuredData'
-import { absoluteUrl } from '@/lib/site-config'
+import { absoluteUrl, getPublicationLogoUrl } from '@/lib/site-config'
 import { notFound } from 'next/navigation'
 
 export const revalidate = 900
@@ -27,7 +27,7 @@ export async function generateMetadata({ params }) {
   const canonical = absoluteUrl(`/tags/${tag.slug}`)
   const title = `${tag.name} News and Updates | EkahNews`
   const description = `Latest news, updates, and stories tagged with ${tag.name} on EkahNews.`
-  const ogImage = absoluteUrl('/logo.png')
+  const ogImage = getPublicationLogoUrl()
 
   return {
     title,
@@ -104,4 +104,5 @@ export default async function TagPage({ params }) {
     </div>
   )
 }
+
 

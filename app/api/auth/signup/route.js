@@ -1,9 +1,14 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { desiredRoleForEmail } from '@/lib/role-utils'
+import { isPublicSignupEnabled } from '@/lib/auth-config'
 
 export async function POST(request) {
     try {
+        if (!isPublicSignupEnabled()) {
+            return NextResponse.json({ error: 'Public signup is disabled' }, { status: 403 })
+        }
+
         const { email, password, name } = await request.json()
 
         if (!email || !password) {
@@ -12,7 +17,6 @@ export async function POST(request) {
 
         const supabase = await createClient()
 
-        // Sign up the user
         const { data: authData, error: authError } = await supabase.auth.signUp({
             email,
             password,
@@ -29,7 +33,6 @@ export async function POST(request) {
 
         const role = desiredRoleForEmail(email)
 
-        // Ensure users table record exists (upsert) and assign role server-side only.
         const { error: upsertError } = await supabase
             .from('users')
             .upsert({ id: userId, email, role }, { onConflict: 'id' })
@@ -39,7 +42,6 @@ export async function POST(request) {
             return NextResponse.json({ error: 'Failed to create user profile' }, { status: 500 })
         }
 
-        // Create author profile for non-admin roles.
         if (role !== 'admin') {
             const { error: authorError } = await supabase
                 .from('authors')

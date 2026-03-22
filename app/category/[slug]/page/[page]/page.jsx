@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import PublicHeader from '@/components/layout/PublicHeader'
 import ArticleMiniCard from '@/components/content/ArticleMiniCard'
 import StructuredData from '@/components/seo/StructuredData'
-import { absoluteUrl } from '@/lib/site-config'
+import { absoluteUrl, getPublicationLogoUrl } from '@/lib/site-config'
 import { notFound } from 'next/navigation'
 
 export const revalidate = 900
@@ -34,7 +34,7 @@ export async function generateMetadata({ params }) {
   const title = `${category.name} News and Updates | Page ${page} | EkahNews`
   const description = category.description
     || `Latest ${category.name} news, updates, and analysis on EkahNews.`
-  const ogImage = absoluteUrl('/logo.png')
+  const ogImage = getPublicationLogoUrl()
 
   return {
     title,
@@ -151,4 +151,5 @@ export default async function CategoryPagePaginated({ params }) {
     </div>
   )
 }
+
 

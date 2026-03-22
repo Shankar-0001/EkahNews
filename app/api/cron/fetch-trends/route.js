@@ -24,10 +24,14 @@ export async function GET(request) {
 
     const admin = createAdminClient()
     const now = new Date().toISOString()
-    const payload = trends.map((item, index) => ({
+    const payload = trends.map((item) => ({
       keyword: item.keyword,
       slug: item.slug,
-      search_volume: Math.max(1, trends.length - index),
+      search_volume: Math.max(0, item.search_volume || 0),
+      created_at: item.created_at || now,
+      source: item.traffic_raw
+        ? `google-trends-rss:${item.traffic_raw}`
+        : `google-trends-rss:${(item.geos || []).join(',') || 'unknown'}`,
       updated_at: now,
     }))
 

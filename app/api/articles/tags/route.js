@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { apiResponse } from '@/lib/api-utils'
+import { requireAdmin } from '@/lib/auth-utils'
+import { validateTag, ValidationError } from '@/lib/validation'
 
 // POST - Create article tag relationships
 export async function POST(request) {
@@ -156,14 +158,11 @@ export async function DELETE(request) {
 // PUT - Create tag
 export async function PUT(request) {
     try {
+        await requireAdmin()
         const supabase = await createClient()
 
-        const { data: { user }, error: authError } = await supabase.auth.getUser()
-        if (authError || !user) {
-            return apiResponse(401, null, 'Unauthorized')
-        }
-
         const { name, slug } = await request.json()
+        validateTag({ name, slug })
         if (!name || !slug) {
             return apiResponse(400, null, 'Name and slug are required')
         }
@@ -190,6 +189,12 @@ export async function PUT(request) {
 
         return apiResponse(201, { tag }, null)
     } catch (error) {
+        if (error.name === 'ValidationError') {
+            return apiResponse(422, null, error.fields?.name || error.message)
+        }
+        if (error.name === 'AuthError') {
+            return apiResponse(error.message.includes('Admin') ? 403 : 401, null, error.message)
+        }
         console.error('[API] Error creating tag:', error)
         return apiResponse(500, null, error.message)
     }

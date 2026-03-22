@@ -134,12 +134,7 @@ export default async function CategoryPage({ params }) {
               </div>
             </div>
 
-            <div className="rounded-[24px] border border-slate-200 bg-slate-950 p-6 text-white shadow-sm dark:border-white/10">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-300">Section Note</p>
-              <p className="mt-3 text-sm leading-6 text-slate-300">
-                This page now behaves more like a category front on a major news site while keeping the same routing, SEO metadata, and pagination logic.
-              </p>
-            </div>
+
           </aside>
         </div>
 

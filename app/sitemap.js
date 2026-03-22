@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getArticleCanonicalUrl } from '@/lib/site-config'
 
 export const revalidate = 3600
 
@@ -10,19 +11,25 @@ export default async function sitemap() {
     { data: categories },
     { data: articles },
     { data: tagLinks },
+    { data: stories },
   ] = await Promise.all([
     supabase
       .from('categories')
       .select('slug, updated_at'),
     supabase
       .from('articles')
-      .select('slug, updated_at, published_at, categories(slug)')
+      .select('slug, canonical_url, updated_at, published_at, categories(slug)')
       .eq('status', 'published')
       .order('published_at', { ascending: false }),
     supabase
       .from('article_tags')
       .select('tag_id, articles!inner(status)')
       .eq('articles.status', 'published'),
+    supabase
+      .from('web_stories')
+      .select('slug, updated_at, published_at')
+      .eq('status', 'published')
+      .order('published_at', { ascending: false }),
   ])
 
   const tagIds = [...new Set((tagLinks || []).map((row) => row.tag_id).filter(Boolean))]
@@ -48,10 +55,17 @@ export default async function sitemap() {
   })) || []
 
   const articleEntries = articles?.map((article) => ({
-    url: `${siteUrl}/${article.categories?.slug || 'news'}/${article.slug}`,
+    url: getArticleCanonicalUrl(article),
     lastModified: new Date(article.updated_at || article.published_at || Date.now()),
     changeFrequency: 'daily',
     priority: 0.8,
+  })) || []
+
+  const storyEntries = stories?.map((story) => ({
+    url: `${siteUrl}/web-stories/${story.slug}`,
+    lastModified: new Date(story.updated_at || story.published_at || Date.now()),
+    changeFrequency: 'daily',
+    priority: 0.6,
   })) || []
 
   return [
@@ -112,7 +126,6 @@ export default async function sitemap() {
     ...categoryHubEntries,
     ...articleEntries,
     ...tagEntries,
+    ...storyEntries,
   ]
 }
-
-

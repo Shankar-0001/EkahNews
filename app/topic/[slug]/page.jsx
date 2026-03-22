@@ -2,7 +2,7 @@ import { createClient as createPublicClient } from '@supabase/supabase-js'
 import PublicHeader from '@/components/layout/PublicHeader'
 import ArticleMiniCard from '@/components/content/ArticleMiniCard'
 import StructuredData from '@/components/seo/StructuredData'
-import { absoluteUrl, slugFromText } from '@/lib/site-config'
+import { absoluteUrl, getPublicationLogoUrl, slugFromText } from '@/lib/site-config'
 import { notFound, permanentRedirect } from 'next/navigation'
 
 export const revalidate = 900
@@ -38,14 +38,14 @@ export async function generateMetadata({ params }) {
       .from('articles')
       .select('id', { count: 'exact', head: true })
       .eq('status', 'published')
-      .or(`title.ilike.${pattern},excerpt.ilike.${pattern},content.ilike.${pattern}`)
+      .or(`title.ilike.${pattern},excerpt.ilike.${pattern}`)
     matchCount = count || 0
   }
 
   const canonical = absoluteUrl(`/topic/${normalized}`)
   const title = `${keyword} News and Updates | EkahNews`
   const description = `Latest news, updates, and explainers about ${keyword} on EkahNews.`
-  const ogImage = absoluteUrl('/logo.png')
+  const ogImage = getPublicationLogoUrl()
   const indexable = matchCount >= MIN_MATCH_COUNT
 
   return {
@@ -117,7 +117,7 @@ export default async function TopicPage({ params }) {
     .limit(MAX_ARTICLES)
 
   if (pattern) {
-    articlesQuery.or(`title.ilike.${pattern},excerpt.ilike.${pattern},content.ilike.${pattern}`)
+    articlesQuery.or(`title.ilike.${pattern},excerpt.ilike.${pattern}`)
   }
 
   const [{ data: categories }, { data: articles }, { data: engagementRows }] = await Promise.all([
@@ -178,4 +178,6 @@ export default async function TopicPage({ params }) {
     </div>
   )
 }
+
+
 

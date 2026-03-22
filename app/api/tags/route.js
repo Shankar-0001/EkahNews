@@ -1,3 +1,4 @@
+import { revalidatePath } from 'next/cache'
 import { apiResponse } from '@/lib/api-utils'
 import { requireAdmin } from '@/lib/auth-utils'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -9,6 +10,13 @@ function getPaging(url) {
   const from = (page - 1) * limit
   const to = from + limit - 1
   return { page, limit, from, to }
+}
+
+function revalidateTagSurface(slug) {
+  revalidatePath('/sitemap.xml')
+  if (slug) {
+    revalidatePath(`/tags/${slug}`)
+  }
 }
 
 export async function GET(request) {
@@ -60,6 +68,7 @@ export async function POST(request) {
       .single()
 
     if (error) return apiResponse(400, null, error.message)
+    revalidateTagSurface(data.slug)
     return apiResponse(201, { tag: data })
   } catch (error) {
     if (error.name === 'AuthError') {
@@ -77,12 +86,19 @@ export async function DELETE(request) {
     const { id } = await request.json()
     if (!id) return apiResponse(400, null, 'Tag ID is required')
 
+    const { data: existingTag } = await admin
+      .from('tags')
+      .select('slug')
+      .eq('id', id)
+      .maybeSingle()
+
     const { error } = await admin
       .from('tags')
       .delete()
       .eq('id', id)
 
     if (error) return apiResponse(400, null, error.message)
+    revalidateTagSurface(existingTag?.slug)
     return apiResponse(200, { deleted: true })
   } catch (error) {
     if (error.name === 'AuthError') {

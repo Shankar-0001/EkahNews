@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { Moon, Sun, Search, Menu, X, Sparkles, TrendingUp } from 'lucide-react'
+import { Moon, Sun, Search, Menu, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -35,20 +35,7 @@ export default function PublicHeader({ categories }) {
   const overflowCategories = (categories || []).slice(DESKTOP_VISIBLE_CATEGORY_COUNT)
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border/80 bg-white/92 shadow-sm backdrop-blur-md dark:bg-slate-950/92 dark:border-slate-800">
-      <div className="border-b border-slate-200/80 bg-slate-50/90 dark:border-slate-800 dark:bg-slate-900/70">
-        <div className="w-full max-w-6xl mx-auto px-4 py-2 flex items-center justify-between gap-4 text-[11px] uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-          <div className="flex items-center gap-2 min-w-0">
-            <Sparkles className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-            <span className="truncate">Fresh reporting, explainers, and web stories in one news desk</span>
-          </div>
-          <div className="hidden lg:flex items-center gap-2 text-slate-500 dark:text-slate-400">
-            <TrendingUp className="h-3.5 w-3.5 text-orange-500" />
-            <span>Live categories update automatically</span>
-          </div>
-        </div>
-      </div>
-
+    <header className="sticky top-0 z-50 border-b border-white/10 bg-[linear-gradient(180deg,_#0f172a_0%,_#020617_100%)] text-white shadow-sm backdrop-blur-md dark:bg-black dark:border-slate-800">
       <div className="w-full max-w-6xl mx-auto px-4">
         {/* Top Bar */}
         <div className="flex items-center justify-between py-4 gap-4">
@@ -58,8 +45,8 @@ export default function PublicHeader({ categories }) {
               <span className="text-lg font-black">E</span>
             </div>
             <div className="leading-tight">
-              <span className="block text-2xl font-bold tracking-tight text-slate-900 dark:text-white">EkahNews</span>
-              <span className="hidden sm:block text-[11px] uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">Independent News Desk</span>
+              <span className="block text-2xl font-bold tracking-tight text-white">EkahNews</span>
+              <span className="hidden sm:block text-[11px] uppercase tracking-[0.24em] text-slate-400">Independent News Desk</span>
             </div>
           </Link>
 
@@ -73,7 +60,7 @@ export default function PublicHeader({ categories }) {
                 placeholder="Search articles..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-11 rounded-full border-slate-200 bg-slate-50 pr-12 pl-4 dark:bg-slate-900 dark:text-white dark:border-slate-700"
+                className="h-11 rounded-full border-white/10 bg-white/10 pr-12 pl-4 text-white placeholder:text-slate-400 dark:bg-white/10 dark:text-white dark:border-white/10"
               />
               <Button
                 type="submit"
@@ -89,11 +76,11 @@ export default function PublicHeader({ categories }) {
           {/* Actions */}
           <div className="flex items-center space-x-2 md:space-x-3">
             {mounted && (
-              <div className="hidden xl:block text-right leading-tight rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+              <div className="hidden xl:block text-right leading-tight rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
+                <p className="text-xs text-slate-300">
                   {new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }).format(now)}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-slate-400">
                   {new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit' }).format(now)}
                 </p>
               </div>
@@ -114,7 +101,7 @@ export default function PublicHeader({ categories }) {
 
             {/* Dashboard Link */}
             <Link href="/dashboard">
-              <Button variant="outline" size="sm" className="hidden md:inline-flex rounded-full border-slate-300 dark:border-slate-700">
+              <Button variant="outline" size="sm" className="hidden md:inline-flex rounded-full border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white">
                 Dashboard
               </Button>
             </Link>
@@ -132,11 +119,11 @@ export default function PublicHeader({ categories }) {
         </div>
 
         {/* Navigation */}
-        <nav className="hidden md:flex items-center justify-between py-3 border-t dark:border-gray-800 gap-4">
+        <nav className="hidden md:flex items-center justify-between py-3 border-t border-white/10 gap-4">
           <div className="flex items-center gap-2 min-w-0 overflow-x-auto">
             <Link
               href="/"
-              className="rounded-full px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium whitespace-nowrap hover:bg-slate-100 dark:hover:bg-slate-900"
+              className="rounded-full px-3 py-2 text-slate-200 font-medium whitespace-nowrap hover:bg-white/10"
             >
               Home
             </Link>
@@ -144,12 +131,12 @@ export default function PublicHeader({ categories }) {
               <Link
                 key={category.id}
                 href={`/category/${category.slug}`}
-                className="rounded-full px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 whitespace-nowrap hover:bg-slate-100 dark:hover:bg-slate-900"
+                className="rounded-full px-3 py-2 text-slate-200 whitespace-nowrap hover:bg-white/10"
               >
                 {category.name}
               </Link>
             ))}
-            <Link href="/web-stories" className="rounded-full px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 whitespace-nowrap hover:bg-slate-100 dark:hover:bg-slate-900">
+            <Link href="/web-stories" className="rounded-full px-3 py-2 text-slate-200 whitespace-nowrap hover:bg-white/10">
               Web Stories
             </Link>
           </div>
@@ -160,7 +147,7 @@ export default function PublicHeader({ categories }) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 shrink-0 rounded-full"
+                  className="text-slate-200 shrink-0 rounded-full hover:bg-white/10 hover:text-white"
                   aria-label="More categories"
                 >
                   <Menu className="h-4 w-4" />
@@ -179,7 +166,7 @@ export default function PublicHeader({ categories }) {
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden py-4 border-t dark:border-gray-800 space-y-4">
+          <div className="md:hidden py-4 border-t border-white/10 space-y-4">
             {/* Mobile Search */}
             <form onSubmit={handleSearch}>
               <div className="relative">
@@ -190,7 +177,7 @@ export default function PublicHeader({ categories }) {
                   placeholder="Search articles..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pr-12 rounded-full dark:bg-slate-900 dark:text-white dark:border-slate-700"
+                  className="pr-12 rounded-full border-white/10 bg-white/10 text-white placeholder:text-slate-400 dark:bg-white/10 dark:text-white dark:border-white/10"
                 />
                 <Button
                   type="submit"
@@ -207,7 +194,7 @@ export default function PublicHeader({ categories }) {
             <nav className="grid grid-cols-1 gap-2">
               <Link
                 href="/"
-                className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium dark:border-slate-800 dark:bg-slate-900"
+                className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-slate-200 font-medium hover:bg-white/10"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Home
@@ -216,7 +203,7 @@ export default function PublicHeader({ categories }) {
                 <Link
                   key={category.id}
                   href={`/category/${category.slug}`}
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 dark:border-slate-800 dark:bg-slate-950"
+                  className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-slate-200 hover:bg-white/10"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   {category.name}
@@ -224,14 +211,14 @@ export default function PublicHeader({ categories }) {
               ))}
               <Link
                 href="/web-stories"
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 dark:border-slate-800 dark:bg-slate-950"
+                className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-slate-200 hover:bg-white/10"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Web Stories
               </Link>
               <Link
                 href="/dashboard"
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 dark:border-slate-800 dark:bg-slate-950"
+                className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-slate-200 hover:bg-white/10"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Dashboard
@@ -243,4 +230,3 @@ export default function PublicHeader({ categories }) {
     </header>
   )
 }
-

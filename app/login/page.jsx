@@ -8,6 +8,8 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import Link from 'next/link'
 
+const publicSignupEnabled = process.env.NEXT_PUBLIC_ALLOW_PUBLIC_SIGNUP === 'true'
+
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -21,7 +23,6 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      // Use server-side auth endpoint to bypass browser SSL issues
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
@@ -83,7 +84,7 @@ export default function LoginPage() {
                 id="password"
                 name="password"
                 type="password"
-                placeholder="••••••••"
+                placeholder="********"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -95,12 +96,14 @@ export default function LoginPage() {
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Signing in...' : 'Sign In'}
             </Button>
-            <p className="text-sm text-center text-gray-600 dark:text-gray-400">
-              Don't have an account?{' '}
-              <Link href="/signup" className="text-blue-600 dark:text-blue-400 hover:underline">
-                Sign up
-              </Link>
-            </p>
+            {publicSignupEnabled && (
+              <p className="text-sm text-center text-gray-600 dark:text-gray-400">
+                Don't have an account?{' '}
+                <Link href="/signup" className="text-blue-600 dark:text-blue-400 hover:underline">
+                  Sign up
+                </Link>
+              </p>
+            )}
           </CardFooter>
         </form>
       </Card>

@@ -1,7 +1,8 @@
+import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { apiResponse } from '@/lib/api-utils'
 import { requireAuth, getUserAuthorId } from '@/lib/auth-utils'
-import { slugFromText } from '@/lib/site-config'
+import { resolveCanonicalUrl, slugFromText } from '@/lib/site-config'
 import { validateWebStoryPayload } from '@/lib/web-story-validation'
 import { normalizeManualKeywords } from '@/lib/keywords'
 
@@ -22,35 +23,73 @@ function normalizeSlides(slides, storyTitle = '') {
     .filter((slide) => slide.image && (slide.headline || storyTitle))
 }
 
-const STORY_SELECT = 'id, title, slug, cover_image, slides, author_id, category_id, tags, keywords, related_article_slug, cta_text, cta_url, whatsapp_group_url, ad_slot, seo_description, created_at, updated_at, authors(name, slug), categories(name, slug)'
+function deriveStoryCtas(slides = []) {
+  const readMoreSlide = (slides || []).find((slide) => slide?.cta_url || slide?.cta_text)
+  const whatsappSlide = (slides || []).find((slide) => slide?.whatsapp_group_url)
+  return {
+    cta_text: readMoreSlide?.cta_text || null,
+    cta_url: readMoreSlide?.cta_url || null,
+    whatsapp_group_url: whatsappSlide?.whatsapp_group_url || null,
+  }
+}
+
+function revalidateStorySurface(story) {
+  revalidatePath('/web-stories')
+  revalidatePath('/web-stories-sitemap.xml')
+  revalidatePath('/sitemap.xml')
+  if (story?.slug) {
+    revalidatePath(`/web-stories/${story.slug}`)
+  }
+}
+
+const STORY_SELECT = 'id, title, slug, cover_image, cover_image_alt, slides, author_id, category_id, tags, keywords, related_article_slug, cta_text, cta_url, whatsapp_group_url, ad_slot, seo_title, seo_description, canonical_url, structured_data, status, published_at, created_at, updated_at, authors(name, slug), categories(name, slug)'
+
+function normalizeStructuredData(value) {
+  if (!value) return null
+  if (typeof value !== 'string') return value
+  try {
+    return JSON.parse(value)
+  } catch {
+    return value
+  }
+}
+
+function toIsoDateTime(value) {
+  if (!value) return null
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString()
+}
+
+function buildStoryPath(slug = '') {
+  return `/web-stories/${slug}`
+}
 
 async function canMutateStory(supabase, storyId, user) {
   if (user.role === 'admin') return true
   const authorId = await getUserAuthorId(user.userId)
   if (!authorId) return false
-
   const { data: story } = await supabase
     .from('web_stories')
     .select('author_id')
     .eq('id', storyId)
     .maybeSingle()
-
   return story?.author_id === authorId
 }
 
 export async function GET(_request, { params }) {
   try {
+    await requireAuth()
     const supabase = await createClient()
     const { data, error } = await supabase
       .from('web_stories')
       .select(STORY_SELECT)
       .eq('id', params.id)
       .maybeSingle()
-
     if (error) return apiResponse(500, null, error.message)
     if (!data) return apiResponse(404, null, 'Story not found')
     return apiResponse(200, { story: data })
   } catch (error) {
+    if (error.name === 'AuthError') return apiResponse(401, null, error.message)
     return apiResponse(500, null, error.message || 'Failed to load story')
   }
 }
@@ -59,43 +98,49 @@ export async function PATCH(request, { params }) {
   try {
     const user = await requireAuth()
     const supabase = await createClient()
-
     const allowed = await canMutateStory(supabase, params.id, user)
     if (!allowed) return apiResponse(403, null, 'Forbidden')
 
     const payload = await request.json()
+    const { data: existingStory } = await supabase
+      .from('web_stories')
+      .select('title, slug, cover_image, cover_image_alt, slides, seo_title, seo_description, canonical_url, structured_data, status, published_at')
+      .eq('id', params.id)
+      .maybeSingle()
+
     const updates = {
-      updated_at: new Date().toISOString(),
+      updated_at: toIsoDateTime(payload.updated_at) || new Date().toISOString(),
     }
 
-    if (typeof payload.title === 'string' && payload.title.trim()) {
-      updates.title = payload.title.trim()
+    if (typeof payload.title === 'string' && payload.title.trim()) updates.title = payload.title.trim()
+    if (typeof payload.slug === 'string' && payload.slug.trim()) updates.slug = slugFromText(payload.slug)
+    if (typeof payload.cover_image === 'string' && payload.cover_image.trim()) updates.cover_image = payload.cover_image
+    if (typeof payload.cover_image_alt === 'string') updates.cover_image_alt = payload.cover_image_alt.trim() || null
+    if (Array.isArray(payload.tags)) updates.tags = payload.tags
+    if ('keywords' in payload) updates.keywords = normalizeManualKeywords(payload.keywords || [])
+    if ('related_article_slug' in payload) updates.related_article_slug = payload.related_article_slug || null
+    if ('seo_title' in payload) updates.seo_title = payload.seo_title?.trim() || null
+    if ('seo_description' in payload) updates.seo_description = payload.seo_description?.trim() || null
+    if ('structured_data' in payload) updates.structured_data = normalizeStructuredData(payload.structured_data)
+    updates.cta_text = payload.cta_text || null
+    updates.cta_url = payload.cta_url || null
+    updates.whatsapp_group_url = payload.whatsapp_group_url || null
+    updates.ad_slot = payload.ad_slot || null
+    if ('category_id' in payload) updates.category_id = payload.category_id || null
+
+    const requestedStatus = payload.status || existingStory?.status || 'draft'
+    updates.status = user.role === 'author'
+      ? (existingStory?.status === 'published'
+        ? 'published'
+        : (requestedStatus === 'published' ? 'pending' : requestedStatus))
+      : requestedStatus
+
+    if ('published_at' in payload || updates.status !== existingStory?.status) {
+      updates.published_at = updates.status === 'published'
+        ? (toIsoDateTime(payload.published_at) || existingStory?.published_at || new Date().toISOString())
+        : null
     }
-    if (typeof payload.slug === 'string' && payload.slug.trim()) {
-      updates.slug = slugFromText(payload.slug)
-    }
-    if (typeof payload.cover_image === 'string' && payload.cover_image.trim()) {
-      updates.cover_image = payload.cover_image
-    }
-    if (Array.isArray(payload.tags)) {
-      updates.tags = payload.tags
-    }
-    if ('keywords' in payload) {
-      updates.keywords = normalizeManualKeywords(payload.keywords || [])
-    }
-    if ('related_article_slug' in payload) {
-      updates.related_article_slug = payload.related_article_slug || null
-    }
-    updates.cta_text = null
-    updates.cta_url = null
-    updates.whatsapp_group_url = null
-    updates.ad_slot = null
-    if ('seo_description' in payload) {
-      updates.seo_description = payload.seo_description || null
-    }
-    if ('category_id' in payload) {
-      updates.category_id = payload.category_id || null
-    }
+
     if ('author_id' in payload && payload.author_id) {
       if (user.role === 'admin') {
         const { data: selectedAuthor } = await supabase
@@ -119,36 +164,41 @@ export async function PATCH(request, { params }) {
       }
     }
 
-    const { data: existingStory } = await supabase
-      .from('web_stories')
-      .select('title, cover_image, slides, seo_description')
-      .eq('id', params.id)
-      .maybeSingle()
-
     const effectiveTitle = updates.title || existingStory?.title || ''
-
     if (payload.slides) {
       const slides = normalizeSlides(payload.slides, effectiveTitle)
       if (slides.length === 0) return apiResponse(422, null, 'At least one valid slide is required')
+      const storyCtas = deriveStoryCtas(slides)
+      updates.cta_text = storyCtas.cta_text
+      updates.cta_url = storyCtas.cta_url
+      updates.whatsapp_group_url = storyCtas.whatsapp_group_url
       updates.slides = slides
-      if (!updates.cover_image) {
-        updates.cover_image = slides[0].image
-      }
-      if (!updates.title) {
-        updates.title = effectiveTitle || slides[0].headline
-      }
-      if (!updates.slug) {
-        updates.slug = slugFromText(updates.title)
-      }
+      if (!updates.cover_image) updates.cover_image = slides[0].image
+      if (!updates.title) updates.title = effectiveTitle || slides[0].headline
+      if (!updates.slug) updates.slug = slugFromText(updates.title)
       if (!updates.seo_description) {
         updates.seo_description = payload.seo_description || slides.find((s) => s.seo_description)?.seo_description || existingStory?.seo_description || null
       }
     }
 
+    const resolvedSlug = updates.slug || existingStory?.slug || ''
+    updates.canonical_url = resolveCanonicalUrl(payload.canonical_url || updates.canonical_url || existingStory?.canonical_url, buildStoryPath(resolvedSlug))
+    if (!updates.seo_title) {
+      updates.seo_title = payload.seo_title || existingStory?.seo_title || updates.title || existingStory?.title || null
+    }
+
     const validation = validateWebStoryPayload({
       title: updates.title || existingStory?.title || '',
       coverImage: updates.cover_image || existingStory?.cover_image || '',
+      coverImageAlt: updates.cover_image_alt || existingStory?.cover_image_alt || updates.title || existingStory?.title || '',
       slides: updates.slides || existingStory?.slides || [],
+      seoTitle: updates.seo_title || existingStory?.seo_title || '',
+      seoDescription: updates.seo_description || existingStory?.seo_description || '',
+      canonicalUrl: updates.canonical_url,
+      structuredData: updates.structured_data || existingStory?.structured_data || null,
+      publishedAt: updates.published_at || existingStory?.published_at || null,
+      updatedAt: updates.updated_at,
+      status: updates.status,
     })
     if (!validation.valid) {
       return apiResponse(422, null, validation.issues[0])
@@ -160,8 +210,10 @@ export async function PATCH(request, { params }) {
       .eq('id', params.id)
       .select(STORY_SELECT)
       .single()
-
     if (error) return apiResponse(500, null, error.message)
+
+    revalidateStorySurface(existingStory)
+    revalidateStorySurface(data)
     return apiResponse(200, { story: data })
   } catch (error) {
     if (error.name === 'AuthError') return apiResponse(401, null, error.message)
@@ -173,16 +225,24 @@ export async function DELETE(_request, { params }) {
   try {
     const user = await requireAuth()
     const supabase = await createClient()
-
     const allowed = await canMutateStory(supabase, params.id, user)
     if (!allowed) return apiResponse(403, null, 'Forbidden')
+
+    const { data: existingStory } = await supabase
+      .from('web_stories')
+      .select('slug')
+      .eq('id', params.id)
+      .maybeSingle()
 
     const { error } = await supabase.from('web_stories').delete().eq('id', params.id)
     if (error) return apiResponse(500, null, error.message)
 
+    revalidateStorySurface(existingStory)
     return apiResponse(200, { ok: true })
   } catch (error) {
     if (error.name === 'AuthError') return apiResponse(401, null, error.message)
     return apiResponse(500, null, error.message || 'Failed to delete story')
   }
 }
+
+

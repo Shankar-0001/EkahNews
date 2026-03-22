@@ -1,3 +1,5 @@
+import { SITE_URL, getPublicationContactInfo, getPublicationLogoUrl, getPublicationSocialProfiles } from '@/lib/site-config'
+
 export default function StructuredData({ data }) {
   return (
     <script
@@ -17,8 +19,6 @@ export function NewsArticleSchema({
   url,
   category,
 }) {
-  const siteUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://ekahnews.com'
-
   return {
     '@context': 'https://schema.org',
     '@type': 'NewsArticle',
@@ -36,7 +36,7 @@ export function NewsArticleSchema({
       name: 'EkahNews',
       logo: {
         '@type': 'ImageObject',
-        url: `${siteUrl}/logo.png`,
+        url: getPublicationLogoUrl(),
       },
     },
     mainEntityOfPage: {
@@ -61,15 +61,32 @@ export function BreadcrumbSchema(items) {
 }
 
 export function OrganizationSchema() {
-  const siteUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://ekahnews.com'
+  const contact = getPublicationContactInfo()
+  const contactPoints = [
+    contact.email
+      ? {
+        '@type': 'ContactPoint',
+        contactType: 'customer support',
+        email: contact.email,
+      }
+      : null,
+    contact.editorialEmail
+      ? {
+        '@type': 'ContactPoint',
+        contactType: 'newsroom',
+        email: contact.editorialEmail,
+      }
+      : null,
+  ].filter(Boolean)
 
   return {
     '@context': 'https://schema.org',
     '@type': 'Organization',
     name: 'EkahNews',
-    url: siteUrl,
-    logo: `${siteUrl}/logo.png`,
-    sameAs: [],
+    url: SITE_URL,
+    logo: getPublicationLogoUrl(),
+    sameAs: getPublicationSocialProfiles(),
+    ...(contactPoints.length > 0 ? { contactPoint: contactPoints } : {}),
   }
 }
 

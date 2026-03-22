@@ -3,10 +3,9 @@ import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { FileText, FolderOpen, Tag, Users, ArrowRight, Plus, TrendingUp } from 'lucide-react'
+import { FileText, FolderOpen, Tag, Users, ArrowRight, Plus } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import DashboardAnalyticsCharts from '@/components/dashboard/DashboardAnalyticsCharts'
-import { fetchGoogleTrendingNow } from '@/lib/trends-fetcher'
 
 export const revalidate = 0
 
@@ -42,17 +41,6 @@ export default async function DashboardPage() {
     .from('authors')
     .select('*', { count: 'exact', head: true })
 
-  const { count: trendingTopicsCount } = await supabase
-    .from('trending_topics')
-    .select('*', { count: 'exact', head: true })
-
-  const { data: latestTrend } = await supabase
-    .from('trending_topics')
-    .select('updated_at')
-    .order('updated_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
   const { data: articlesForAnalytics } = await supabase
     .from('articles')
     .select('id, title, slug, status, published_at')
@@ -69,18 +57,6 @@ export default async function DashboardPage() {
       .in('article_id', articleIds)
     engagementRows = data || []
   }
-  let trendRows = []
-  try {
-    trendRows = await fetchGoogleTrendingNow({ limit: 120 })
-  } catch {
-    const { data: fallbackTrends } = await supabase
-      .from('trending_topics')
-      .select('keyword, slug, search_volume, created_at, updated_at')
-      .order('search_volume', { ascending: false })
-      .limit(120)
-    trendRows = fallbackTrends || []
-  }
-
   const engagementMap = new Map((engagementRows || []).map((row) => [
     row.article_id,
     {
@@ -196,7 +172,6 @@ export default async function DashboardPage() {
 
       <DashboardAnalyticsCharts
         articles={articleAnalytics}
-        trendingTopics={trendRows || []}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -254,7 +229,7 @@ export default async function DashboardPage() {
               <Link href="/dashboard/articles/new" className="block">
                 <Button className="w-full justify-start">
                   <Plus className="mr-2 h-4 w-4" />
-                  New Article
+                  New Content
                 </Button>
               </Link>
               <Link href="/dashboard/articles" className="block">
@@ -287,33 +262,6 @@ export default async function DashboardPage() {
               )}
             </CardContent>
           </Card>
-
-          {userData?.role === 'admin' && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4" />
-                  Trending Engine Status
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                <p className="text-gray-700 dark:text-gray-300">
-                  Cached topics: <span className="font-semibold">{trendingTopicsCount || 0}</span>
-                </p>
-                <p className="text-gray-700 dark:text-gray-300">
-                  Last fetch:{' '}
-                  <span className="font-semibold">
-                    {latestTrend?.updated_at
-                      ? formatDistanceToNow(new Date(latestTrend.updated_at), { addSuffix: true })
-                      : 'Never'}
-                  </span>
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Cron endpoint: /api/cron/fetch-trends
-                </p>
-              </CardContent>
-            </Card>
-          )}
         </div>
       </div>
     </div>

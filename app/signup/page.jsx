@@ -8,6 +8,8 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import Link from 'next/link'
 
+const publicSignupEnabled = process.env.NEXT_PUBLIC_ALLOW_PUBLIC_SIGNUP === 'true'
+
 export default function SignupPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -18,11 +20,16 @@ export default function SignupPage() {
 
   const handleSignup = async (e) => {
     e.preventDefault()
+
+    if (!publicSignupEnabled) {
+      setError('Public signup is disabled. Please contact an administrator for access.')
+      return
+    }
+
     setError('')
     setLoading(true)
 
     try {
-      // Use server-side signup endpoint to bypass browser SSL issues
       const response = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: {
@@ -55,7 +62,9 @@ export default function SignupPage() {
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center dark:text-white">Create Account</CardTitle>
           <CardDescription className="text-center dark:text-gray-400">
-            Enter your details to create your account
+            {publicSignupEnabled
+              ? 'Enter your details to create your account'
+              : 'Public registration is disabled for this newsroom.'}
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSignup}>
@@ -63,6 +72,11 @@ export default function SignupPage() {
             {error && (
               <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-3 rounded-md text-sm">
                 {error}
+              </div>
+            )}
+            {!publicSignupEnabled && (
+              <div className="rounded-md bg-blue-50 p-3 text-sm text-blue-700 dark:bg-blue-900/20 dark:text-blue-300">
+                Contact your administrator to get an invited account.
               </div>
             )}
             <div className="space-y-2">
@@ -75,6 +89,7 @@ export default function SignupPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
+                disabled={!publicSignupEnabled}
                 className="dark:bg-gray-700 dark:text-white dark:border-gray-600"
               />
             </div>
@@ -88,6 +103,7 @@ export default function SignupPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                disabled={!publicSignupEnabled}
                 className="dark:bg-gray-700 dark:text-white dark:border-gray-600"
               />
             </div>
@@ -97,18 +113,19 @@ export default function SignupPage() {
                 id="password"
                 name="password"
                 type="password"
-                placeholder="••••••••"
+                placeholder="********"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={6}
+                disabled={!publicSignupEnabled}
                 className="dark:bg-gray-700 dark:text-white dark:border-gray-600"
               />
               <p className="text-xs text-gray-500 dark:text-gray-400">Minimum 6 characters</p>
             </div>
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full" disabled={loading || !publicSignupEnabled}>
               {loading ? 'Creating account...' : 'Sign Up'}
             </Button>
             <p className="text-sm text-center text-gray-600 dark:text-gray-400">

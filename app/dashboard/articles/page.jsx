@@ -67,7 +67,7 @@ export default async function ArticlesPage({ searchParams }) {
         <Link href="/dashboard/articles/new">
           <Button className="w-full sm:w-auto">
             <Plus className="mr-2 h-4 w-4" />
-            New Article
+            New Content
           </Button>
         </Link>
       </div>
@@ -151,7 +151,7 @@ export default async function ArticlesPage({ searchParams }) {
             <Link href="/dashboard/articles/new">
               <Button>
                 <Plus className="mr-2 h-4 w-4" />
-                Create Article
+                Create Content
               </Button>
             </Link>
           </div>

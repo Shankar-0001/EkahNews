@@ -65,7 +65,7 @@ export async function GET(_request, context) {
       .from('articles')
       .select('id', { count: 'exact', head: true })
       .eq('status', 'published')
-      .or(`title.ilike.${pattern},excerpt.ilike.${pattern},content.ilike.${pattern}`)
+      .or(`title.ilike.${pattern},excerpt.ilike.${pattern}`)
 
     if (error || (count || 0) < MIN_MATCH_COUNT) {
       return null
