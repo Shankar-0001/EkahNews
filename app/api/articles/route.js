@@ -1,15 +1,22 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { apiResponse, logger } from '@/lib/api-utils'
-import { validateArticle } from '@/lib/validation'
+import { validateArticle, ValidationError } from '@/lib/validation'
 import { requireAuth, getUserAuthorId } from '@/lib/auth-utils'
 import { sanitizeRichText } from '@/lib/security-utils'
 import { normalizeManualKeywords } from '@/lib/keywords'
 
 function normalizeStructuredData(value) {
   if (!value) return null
-  if (typeof value === 'string') return JSON.parse(value)
-  return value
+  if (typeof value !== 'string') return value
+
+  try {
+    return JSON.parse(value)
+  } catch {
+    throw new ValidationError('Structured data override must be valid JSON', {
+      structured_data: 'Structured data override must be valid JSON',
+    })
+  }
 }
 
 function revalidateArticleSurface(article) {
@@ -60,6 +67,8 @@ export async function POST(request) {
     }
 
     const sanitizedContent = sanitizeRichText(articleData.content)
+    const structuredData = normalizeStructuredData(articleData.structured_data)
+
     const { data: article, error } = await supabase
       .from('articles')
       .insert([{
@@ -69,7 +78,7 @@ export async function POST(request) {
         keywords: articleData.keywords,
         canonical_url: articleData.canonical_url || null,
         schema_type: articleData.schema_type || 'NewsArticle',
-        structured_data: normalizeStructuredData(articleData.structured_data),
+        structured_data: structuredData,
         published_at: articleData.published_at || null,
         updated_at: articleData.updated_at || new Date().toISOString(),
       }])
@@ -86,7 +95,7 @@ export async function POST(request) {
     return apiResponse(201, { article })
   } catch (error) {
     if (error.name === 'ValidationError') {
-      return apiResponse(422, null, error.message)
+      return apiResponse(422, null, error.fields?.structured_data || error.message)
     }
     if (error.name === 'AuthError') {
       return apiResponse(401, null, error.message)

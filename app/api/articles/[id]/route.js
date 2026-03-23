@@ -1,15 +1,22 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { apiResponse, logger } from '@/lib/api-utils'
-import { validateArticle } from '@/lib/validation'
+import { validateArticle, ValidationError } from '@/lib/validation'
 import { requireAuth, canEditArticle, canDeleteArticle } from '@/lib/auth-utils'
 import { sanitizeRichText } from '@/lib/security-utils'
 import { normalizeManualKeywords } from '@/lib/keywords'
 
 function normalizeStructuredData(value) {
   if (!value) return null
-  if (typeof value === 'string') return JSON.parse(value)
-  return value
+  if (typeof value !== 'string') return value
+
+  try {
+    return JSON.parse(value)
+  } catch {
+    throw new ValidationError('Structured data override must be valid JSON', {
+      structured_data: 'Structured data override must be valid JSON',
+    })
+  }
 }
 
 function revalidateArticleSurface(article) {
@@ -53,12 +60,13 @@ export async function PATCH(request, { params }) {
       .eq('id', params.id)
       .maybeSingle()
 
+    const structuredData = normalizeStructuredData(data.structured_data)
     const updatePayload = {
       ...data,
       content: sanitizeRichText(data.content),
       canonical_url: data.canonical_url || null,
       schema_type: data.schema_type || 'NewsArticle',
-      structured_data: normalizeStructuredData(data.structured_data),
+      structured_data: structuredData,
       updated_at: data.updated_at || new Date().toISOString(),
     }
 
@@ -87,7 +95,7 @@ export async function PATCH(request, { params }) {
     return apiResponse(200, { article: updatedArticle })
   } catch (error) {
     if (error.name === 'ValidationError') {
-      return apiResponse(422, null, error.message)
+      return apiResponse(422, null, error.fields?.structured_data || error.message)
     }
     if (error.name === 'AuthError') {
       return apiResponse(error.message.includes('Forbidden') ? 403 : 401, null, error.message)

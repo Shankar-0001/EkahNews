@@ -158,19 +158,21 @@ export default async function TrendingKeywordPage({ params }) {
 
   const [
     { data: categories },
+    { data: requestedTrend },
     { data: trendRows },
     { data: matchedArticles },
     { data: engagementRows },
     { data: allStories },
   ] = await Promise.all([
     supabase.from('categories').select('id, name, slug').order('name'),
+    supabase.from('trending_topics').select('keyword, slug, search_volume, created_at, updated_at').eq('slug', normalizedRequested).maybeSingle(),
     supabase.from('trending_topics').select('keyword, slug, search_volume, created_at, updated_at').order('search_volume', { ascending: false }).limit(10),
     articlesQuery,
     supabase.from('article_engagement').select('article_id, views, likes, shares').limit(10),
     supabase.from('web_stories').select('id, title, slug, cover_image, slides, created_at').order('created_at', { ascending: false }).limit(10),
   ])
 
-  const trendKeyword = (trendRows || []).find((row) => row.slug === normalizedRequested)
+  const trendKeyword = requestedTrend || (trendRows || []).find((row) => row.slug === normalizedRequested)
   const relatedByKeyword = matchedArticles || []
 
   if (!trendKeyword && relatedByKeyword.length < MIN_MATCH_COUNT) {
@@ -204,7 +206,10 @@ export default async function TrendingKeywordPage({ params }) {
     .filter((a) => /explain|guide|what is|how to|analysis/i.test(`${a.title || ''} ${a.excerpt || ''}`))
     .slice(0, 6)
 
-  const relatedTopics = (trendRows || [])
+  const relatedTopics = [
+    ...(requestedTrend && !(trendRows || []).some((row) => row.slug === requestedTrend.slug) ? [requestedTrend] : []),
+    ...(trendRows || []),
+  ]
     .filter((row) => row.slug !== normalizedRequested)
     .slice(0, 8)
 
