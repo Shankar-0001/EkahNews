@@ -1,5 +1,6 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { apiResponse, logger } from '@/lib/api-utils'
 import { validateArticle, ValidationError } from '@/lib/validation'
 import { requireAuth, canEditArticle, canDeleteArticle } from '@/lib/auth-utils'
@@ -53,8 +54,8 @@ export async function PATCH(request, { params }) {
       return apiResponse(403, null, 'Forbidden: Cannot edit this article')
     }
 
-    const supabase = await createClient()
-    const { data: existingArticle } = await supabase
+    const admin = createAdminClient()
+    const { data: existingArticle } = await admin
       .from('articles')
       .select('slug, categories(slug), authors(slug)')
       .eq('id', params.id)
@@ -74,7 +75,7 @@ export async function PATCH(request, { params }) {
       delete updatePayload.author_id
     }
 
-    const { data: updatedArticle, error } = await supabase
+    const { data: updatedArticle, error } = await admin
       .from('articles')
       .update(updatePayload)
       .eq('id', params.id)
@@ -119,14 +120,14 @@ export async function DELETE(request, { params }) {
       return apiResponse(403, null, 'Forbidden: Cannot delete this article')
     }
 
-    const supabase = await createClient()
-    const { data: existingArticle } = await supabase
+    const admin = createAdminClient()
+    const { data: existingArticle } = await admin
       .from('articles')
       .select('slug, categories(slug), authors(slug)')
       .eq('id', params.id)
       .maybeSingle()
 
-    const { error } = await supabase
+    const { error } = await admin
       .from('articles')
       .delete()
       .eq('id', params.id)

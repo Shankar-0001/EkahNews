@@ -1,5 +1,6 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { apiResponse, logger } from '@/lib/api-utils'
 import { validateArticle, ValidationError } from '@/lib/validation'
 import { requireAuth, getUserAuthorId } from '@/lib/auth-utils'
@@ -48,10 +49,11 @@ export async function POST(request) {
     validateArticle(articleData)
 
     const supabase = await createClient()
+    const admin = createAdminClient()
     let authorId = await getUserAuthorId(user.userId)
 
     if (user.role === 'admin' && articleData.author_id) {
-      const { data: authorRecord } = await supabase
+      const { data: authorRecord } = await admin
         .from('authors')
         .select('id')
         .eq('id', articleData.author_id)
@@ -69,7 +71,7 @@ export async function POST(request) {
     const sanitizedContent = sanitizeRichText(articleData.content)
     const structuredData = normalizeStructuredData(articleData.structured_data)
 
-    const { data: article, error } = await supabase
+    const { data: article, error } = await admin
       .from('articles')
       .insert([{
         ...articleData,

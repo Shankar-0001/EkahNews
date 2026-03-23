@@ -1,14 +1,15 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { apiResponse } from '@/lib/api-utils'
 import { requireAdmin } from '@/lib/auth-utils'
-import { validateTag, ValidationError } from '@/lib/validation'
+import { validateTag } from '@/lib/validation'
 
 // POST - Create article tag relationships
 export async function POST(request) {
     try {
         const supabase = await createClient()
+        const admin = createAdminClient()
 
-        // Get authenticated user
         const { data: { user }, error: authError } = await supabase.auth.getUser()
         if (authError || !user) {
             return apiResponse(401, null, 'Unauthorized')
@@ -20,8 +21,7 @@ export async function POST(request) {
             return apiResponse(400, null, 'Tag relations must be a non-empty array')
         }
 
-        // Validate all tag relations have required fields
-        const valid = tagRelations.every(rel => rel.article_id && rel.tag_id)
+        const valid = tagRelations.every((rel) => rel.article_id && rel.tag_id)
         if (!valid) {
             return apiResponse(400, null, 'Each tag relation must have article_id and tag_id')
         }
@@ -32,8 +32,7 @@ export async function POST(request) {
         }
         const articleId = articleIds[0]
 
-        // Verify user can edit this article (owner or admin)
-        const { data: article, error: articleError } = await supabase
+        const { data: article, error: articleError } = await admin
             .from('articles')
             .select('author_id')
             .eq('id', articleId)
@@ -43,7 +42,7 @@ export async function POST(request) {
             return apiResponse(404, null, 'Article not found')
         }
 
-        const { data: userData } = await supabase
+        const { data: userData } = await admin
             .from('users')
             .select('role')
             .eq('id', user.id)
@@ -52,7 +51,7 @@ export async function POST(request) {
         const isAdmin = userData?.role === 'admin'
 
         if (!isAdmin) {
-            const { data: authorData } = await supabase
+            const { data: authorData } = await admin
                 .from('authors')
                 .select('id')
                 .eq('user_id', user.id)
@@ -63,8 +62,7 @@ export async function POST(request) {
             }
         }
 
-        // Replace tag relations
-        const { error: deleteError } = await supabase
+        const { error: deleteError } = await admin
             .from('article_tags')
             .delete()
             .eq('article_id', articleId)
@@ -73,8 +71,7 @@ export async function POST(request) {
             return apiResponse(500, null, deleteError.message)
         }
 
-        // Insert tag relations
-        const { data, error } = await supabase
+        const { data, error } = await admin
             .from('article_tags')
             .insert(tagRelations)
             .select('article_id, tag_id')
@@ -94,8 +91,8 @@ export async function POST(request) {
 export async function DELETE(request) {
     try {
         const supabase = await createClient()
+        const admin = createAdminClient()
 
-        // Get authenticated user
         const { data: { user }, error: authError } = await supabase.auth.getUser()
         if (authError || !user) {
             return apiResponse(401, null, 'Unauthorized')
@@ -107,8 +104,7 @@ export async function DELETE(request) {
             return apiResponse(400, null, 'Article ID is required')
         }
 
-        // Verify user can edit this article (owner or admin)
-        const { data: article, error: articleError } = await supabase
+        const { data: article, error: articleError } = await admin
             .from('articles')
             .select('author_id')
             .eq('id', articleId)
@@ -118,7 +114,7 @@ export async function DELETE(request) {
             return apiResponse(404, null, 'Article not found')
         }
 
-        const { data: userData } = await supabase
+        const { data: userData } = await admin
             .from('users')
             .select('role')
             .eq('id', user.id)
@@ -127,7 +123,7 @@ export async function DELETE(request) {
         const isAdmin = userData?.role === 'admin'
 
         if (!isAdmin) {
-            const { data: authorData } = await supabase
+            const { data: authorData } = await admin
                 .from('authors')
                 .select('id')
                 .eq('user_id', user.id)
@@ -138,8 +134,7 @@ export async function DELETE(request) {
             }
         }
 
-        // Delete all tags for this article
-        const { error } = await supabase
+        const { error } = await admin
             .from('article_tags')
             .delete()
             .eq('article_id', articleId)
@@ -159,7 +154,7 @@ export async function DELETE(request) {
 export async function PUT(request) {
     try {
         await requireAdmin()
-        const supabase = await createClient()
+        const admin = createAdminClient()
 
         const { name, slug } = await request.json()
         validateTag({ name, slug })
@@ -167,7 +162,7 @@ export async function PUT(request) {
             return apiResponse(400, null, 'Name and slug are required')
         }
 
-        const { data: existing } = await supabase
+        const { data: existing } = await admin
             .from('tags')
             .select('id, name, slug')
             .eq('slug', slug)
@@ -177,7 +172,7 @@ export async function PUT(request) {
             return apiResponse(200, { tag: existing }, null)
         }
 
-        const { data: tag, error } = await supabase
+        const { data: tag, error } = await admin
             .from('tags')
             .insert({ name, slug })
             .select('id, name, slug')
