@@ -103,7 +103,7 @@ export async function PATCH(request, { params }) {
     }
 
     logger.error(requestId, error)
-    return apiResponse(500, null, 'Internal server error')
+    return apiResponse(500, null, error.message || 'Internal server error')
   }
 }
 
@@ -149,6 +149,7 @@ export async function DELETE(request, { params }) {
     }
 
     logger.error(requestId, error)
-    return apiResponse(500, null, 'Internal server error')
+    return apiResponse(500, null, error.message || 'Internal server error')
   }
 }
+

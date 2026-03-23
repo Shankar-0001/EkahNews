@@ -104,6 +104,7 @@ export async function POST(request) {
     }
 
     logger.error(requestId, error)
-    return apiResponse(500, null, 'Internal server error')
+    return apiResponse(500, null, error.message || 'Internal server error')
   }
 }
+
