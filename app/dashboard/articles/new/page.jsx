@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -22,6 +23,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import KeywordInput from '@/components/dashboard/KeywordInput'
+import TagInput from '@/components/dashboard/TagInput'
 import {
   Dialog,
   DialogContent,
@@ -37,10 +39,47 @@ const TipTapEditor = dynamic(() => import('@/components/editor/TipTapEditor'), {
   loading: () => <p className="text-sm text-gray-500">Loading editor...</p>,
 })
 
-const WebStoryEditor = dynamic(() => import('@/components/dashboard/WebStoryEditor'), {
-  ssr: false,
-  loading: () => <p className="text-sm text-gray-500">Loading story editor...</p>,
-})
+function findLatestNewsCategory(categories = []) {
+  return (
+    categories.find((category) => category.slug === 'latest-news')
+    || categories.find((category) => category.name?.trim().toLowerCase() === 'latest news')
+    || null
+  )
+}
+
+function getApiErrorMessage(errorPayload, fallbackMessage) {
+  if (!errorPayload) return fallbackMessage
+  if (typeof errorPayload === 'string') return errorPayload
+  if (typeof errorPayload === 'object') {
+    const firstFieldError = Object.values(errorPayload).find((value) => typeof value === 'string' && value.trim())
+    if (firstFieldError) return firstFieldError
+  }
+  return fallbackMessage
+}
+
+function validateSubmissionReadiness({
+  title,
+  excerpt,
+  content,
+  categoryId,
+  featuredImage,
+  featuredImageAlt,
+  seoTitle,
+  seoDescription,
+  nextStatus,
+}) {
+  if (!title.trim()) return 'Article title is required'
+  if (!content.html || content.html.trim().length === 0) return 'Article content cannot be empty'
+  if (nextStatus !== 'draft' && nextStatus !== 'archived') {
+    if (!categoryId) return 'Category is required before submission'
+    if (!excerpt.trim()) return 'Excerpt is required before submission'
+    if (!featuredImage) return 'Featured image is required before submission'
+    if (!featuredImageAlt.trim()) return 'Featured image alt text is required before submission'
+    if (!seoTitle.trim()) return 'SEO title is required before submission'
+    if (!seoDescription.trim()) return 'SEO description is required before submission'
+  }
+  return ''
+}
 
 export default function ArticleEditorPage() {
   const router = useRouter()
@@ -79,7 +118,6 @@ export default function ArticleEditorPage() {
   const [categories, setCategories] = useState([])
   const [tags, setTags] = useState([])
   const [authors, setAuthors] = useState([])
-  const [newTagName, setNewTagName] = useState('')
 
   useEffect(() => {
     loadUserAndData()
@@ -156,9 +194,15 @@ export default function ArticleEditorPage() {
         setAuthors([ownAuthor])
       }
 
-      setCategories(categoriesData || [])
+      const resolvedCategories = categoriesData || []
+      const latestNewsCategory = findLatestNewsCategory(resolvedCategories)
+
+      setCategories(resolvedCategories)
       setTags(tagsData || [])
       setSelectedAuthorId(authorData.id)
+      if (latestNewsCategory?.id) {
+        setCategoryId(latestNewsCategory.id)
+      }
       setInitializing(false)
     } catch (err) {
       console.error('Error loading user data:', err)
@@ -273,11 +317,24 @@ export default function ArticleEditorPage() {
   }
 
   const savArticle = async (newStatus) => {
-    if (!title.trim()) {
+    const finalStatus = userRole === 'author' ? 'pending' : newStatus
+    const readinessError = validateSubmissionReadiness({
+      title,
+      excerpt,
+      content,
+      categoryId,
+      featuredImage,
+      featuredImageAlt,
+      seoTitle,
+      seoDescription,
+      nextStatus: finalStatus,
+    })
+
+    if (readinessError) {
       toast({
         variant: 'destructive',
         title: 'Validation error',
-        description: 'Article title is required',
+        description: readinessError,
       })
       return
     }
@@ -287,22 +344,12 @@ export default function ArticleEditorPage() {
       return
     }
 
-    if (!content.html || content.html.trim().length === 0) {
-      toast({
-        variant: 'destructive',
-        title: 'Validation error',
-        description: 'Article content cannot be empty',
-      })
-      return
-    }
-
     setLoading(true)
     setError(null)
 
     let createdArticleId = null
 
     try {
-      const finalStatus = userRole === 'author' ? 'pending' : newStatus
       const normalizedPublishedAt = finalStatus === 'published'
         ? (toIsoDateTime(publishDate) || new Date().toISOString())
         : null
@@ -337,7 +384,7 @@ export default function ArticleEditorPage() {
       const result = await response.json()
 
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to create article')
+        throw new Error(getApiErrorMessage(result.error, 'Failed to create article'))
       }
 
       const article = result?.data?.article
@@ -375,7 +422,6 @@ export default function ArticleEditorPage() {
 
       router.push('/dashboard/articles')
     } catch (err) {
-      console.error('Error saving article:', err)
       setError(err.message || 'Failed to save article')
       toast({
         variant: 'destructive',
@@ -390,16 +436,8 @@ export default function ArticleEditorPage() {
     }
   }
 
-  const toggleTag = (tagId) => {
-    setSelectedTags(prev =>
-      prev.includes(tagId)
-        ? prev.filter(id => id !== tagId)
-        : [...prev, tagId]
-    )
-  }
-
-  const createTag = async () => {
-    const name = newTagName.trim()
+  const createTag = async (rawName) => {
+    const name = rawName.trim()
     if (!name) return
 
     const newSlug = createSlug(name)
@@ -412,9 +450,7 @@ export default function ArticleEditorPage() {
     if (response.ok && result?.data?.tag) {
       const createdTag = result.data.tag
       setTags((prev) => [...prev, createdTag])
-      setSelectedTags((prev) => [...prev, createdTag.id])
-      setNewTagName('')
-      return
+      return createdTag
     }
 
     toast({
@@ -422,6 +458,7 @@ export default function ArticleEditorPage() {
       title: 'Tag creation failed',
       description: result?.error || 'Could not create tag',
     })
+    return null
   }
 
   const selectedCategory = categories.find((cat) => cat.id === categoryId)
@@ -446,16 +483,6 @@ export default function ArticleEditorPage() {
       excerpt: 'Brief summary of the news story...',
       content: 'News Content',
       preview: 'News Preview',
-    },
-    'web-story': {
-      name: 'Web Story',
-      description: 'Visual story workflow with slide-based publishing.',
-      action: 'Create a visual web story',
-      title: 'Web Story Title',
-      slug: 'web-story-slug',
-      excerpt: 'Short summary of the web story...',
-      content: 'Story Content',
-      preview: 'Story Preview',
     },
   }
   const activeContent = contentLabels[contentType]
@@ -504,19 +531,22 @@ export default function ArticleEditorPage() {
               <SelectContent>
                 <SelectItem value="article">Article</SelectItem>
                 <SelectItem value="news">News</SelectItem>
-                <SelectItem value="web-story">Web Story</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               {activeContent.description}
             </p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Web stories are created separately in{' '}
+              <Link href="/dashboard/web-stories/new" className="font-medium text-primary hover:underline">
+                Web Stories Editor
+              </Link>
+              .
+            </p>
           </CardContent>
         </Card>
 
-        {contentType === 'web-story' ? (
-          <WebStoryEditor mode="create" />
-        ) : (
-          <>
+        <>
             {/* Title */}
             <Card>
           <CardHeader>
@@ -665,37 +695,13 @@ export default function ArticleEditorPage() {
             <CardTitle className="text-lg">Tags</CardTitle>
           </CardHeader>
           <CardContent>
-            {userRole === 'admin' && (
-              <div className="flex gap-2 mb-4">
-                <Input
-                  value={newTagName}
-                  onChange={(e) => setNewTagName(e.target.value)}
-                  placeholder="Create new tag"
-                />
-                <Button type="button" variant="outline" onClick={createTag}>
-                  Add
-                </Button>
-              </div>
-            )}
-            {userRole !== 'admin' && (
-              <p className="mb-4 text-sm text-gray-500">Authors can apply existing tags but cannot create new taxonomy.</p>
-            )}
-            <div className="flex flex-wrap gap-2">
-              {tags.length > 0 ? (
-                tags.map(tag => (
-                  <Badge
-                    key={tag.id}
-                    variant={selectedTags.includes(tag.id) ? 'default' : 'outline'}
-                    className="cursor-pointer"
-                    onClick={() => toggleTag(tag.id)}
-                  >
-                    {tag.name}
-                  </Badge>
-                ))
-              ) : (
-                <p className="text-sm text-gray-500">No tags available</p>
-              )}
-            </div>
+            <TagInput
+              tags={tags}
+              value={selectedTags}
+              onChange={setSelectedTags}
+              onCreateTag={createTag}
+              description="Type a tag and press Enter to add it. Both admins and authors can create missing tags here."
+            />
           </CardContent>
             </Card>
 
@@ -899,8 +905,7 @@ export default function ArticleEditorPage() {
                 </div>
               </DialogContent>
             </Dialog>
-          </>
-        )}
+        </>
       </div>
     </div>
   )

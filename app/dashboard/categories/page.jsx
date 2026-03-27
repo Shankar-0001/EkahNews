@@ -11,6 +11,7 @@ import { createSlug } from '@/lib/slug'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,

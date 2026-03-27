@@ -69,7 +69,7 @@ export default function ArticleEngagementBar({ articleId, articleUrl, articleTit
   }
 
   return (
-    <section className="mb-8 rounded-xl border border-border bg-card p-4 shadow-sm">
+    <section className="mb-8 border border-border bg-card p-4 shadow-sm">
       <div className="flex flex-wrap items-center gap-4 text-sm text-gray-700 dark:text-gray-300">
         <span className="inline-flex items-center gap-1.5"><Eye className="h-4 w-4" /> {formatMetric(metrics.views)}</span>
         <button onClick={() => performAction('like')} className="inline-flex items-center gap-1.5 hover:text-red-600">
@@ -87,3 +87,4 @@ export default function ArticleEngagementBar({ articleId, articleUrl, articleTit
     </section>
   )
 }
+

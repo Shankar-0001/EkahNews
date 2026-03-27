@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createPublicClient } from '@/lib/supabase/public-server'
 import PublicHeader from '@/components/layout/PublicHeader'
 import ArticleMiniCard from '@/components/content/ArticleMiniCard'
 import { notFound } from 'next/navigation'
@@ -22,7 +22,7 @@ export async function generateMetadata({ searchParams }) {
 
 export default async function SearchPage({ searchParams }) {
   const query = searchParams?.q
-  const supabase = await createClient()
+  const supabase = createPublicClient()
   const { data: categories } = await supabase
     .from('categories')
     .select('id, name, slug')
@@ -71,3 +71,4 @@ export default async function SearchPage({ searchParams }) {
     </div>
   )
 }
+

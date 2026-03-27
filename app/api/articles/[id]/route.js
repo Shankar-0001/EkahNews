@@ -5,6 +5,7 @@ import { validateArticle, ValidationError } from '@/lib/validation'
 import { requireRequestAuth, canEditArticle, canDeleteArticle } from '@/lib/auth-utils'
 import { sanitizeRichText } from '@/lib/security-utils'
 import { normalizeManualKeywords } from '@/lib/keywords'
+import { validateArticlePublishReadiness } from '@/lib/article-publish-validation'
 
 function normalizeStructuredData(value) {
   if (!value) return null
@@ -56,9 +57,25 @@ export async function PATCH(request, { params }) {
     const admin = createAdminClient()
     const { data: existingArticle } = await admin
       .from('articles')
-      .select('slug, categories(slug), authors(slug)')
+      .select('slug, excerpt, featured_image_url, featured_image_alt, seo_description, published_at, categories(slug), authors(slug)')
       .eq('id', params.id)
       .maybeSingle()
+
+    if (!existingArticle) {
+      return apiResponse(404, null, 'Article not found')
+    }
+
+    const publishCandidate = {
+      ...existingArticle,
+      ...data,
+      excerpt: data.excerpt ?? existingArticle.excerpt,
+      featured_image_url: data.featured_image_url ?? existingArticle.featured_image_url,
+      featured_image_alt: data.featured_image_alt ?? existingArticle.featured_image_alt,
+      seo_description: data.seo_description ?? existingArticle.seo_description,
+      status: data.status || 'draft',
+    }
+
+    await validateArticlePublishReadiness(admin, publishCandidate)
 
     const structuredData = normalizeStructuredData(data.structured_data)
     const updatePayload = {
@@ -68,6 +85,10 @@ export async function PATCH(request, { params }) {
       schema_type: data.schema_type || 'NewsArticle',
       structured_data: structuredData,
       updated_at: data.updated_at || new Date().toISOString(),
+    }
+
+    if (!updatePayload.published_at && updatePayload.status === 'published') {
+      updatePayload.published_at = existingArticle.published_at || new Date().toISOString()
     }
 
     if (user.role !== 'admin') {
@@ -86,16 +107,14 @@ export async function PATCH(request, { params }) {
       return apiResponse(400, null, error.message)
     }
 
-    if (existingArticle) {
-      revalidateArticleSurface(existingArticle)
-    }
+    revalidateArticleSurface(existingArticle)
     revalidateArticleSurface(updatedArticle)
 
     logger.info(`[${requestId}] Article updated successfully`)
     return apiResponse(200, { article: updatedArticle })
   } catch (error) {
     if (error.name === 'ValidationError') {
-      return apiResponse(422, null, error.fields?.structured_data || error.message)
+      return apiResponse(422, null, error.fields || error.message)
     }
     if (error.name === 'AuthError') {
       return apiResponse(error.message.includes('Forbidden') ? 403 : 401, null, error.message)
@@ -151,4 +170,3 @@ export async function DELETE(request, { params }) {
     return apiResponse(500, null, error.message || 'Internal server error')
   }
 }
-

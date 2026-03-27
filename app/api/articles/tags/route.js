@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { apiResponse } from '@/lib/api-utils'
-import { requireAdmin, requireRequestAuth } from '@/lib/auth-utils'
+import { requireRequestAuth } from '@/lib/auth-utils'
 import { validateTag } from '@/lib/validation'
 
 // POST - Create article tag relationships
@@ -142,7 +142,7 @@ export async function DELETE(request) {
 // PUT - Create tag
 export async function PUT(request) {
     try {
-        await requireAdmin(request)
+        await requireRequestAuth(request)
         const admin = createAdminClient()
 
         const { name, slug } = await request.json()
@@ -177,7 +177,7 @@ export async function PUT(request) {
             return apiResponse(422, null, error.fields?.name || error.message)
         }
         if (error.name === 'AuthError') {
-            return apiResponse(error.message.includes('Admin') ? 403 : 401, null, error.message)
+            return apiResponse(401, null, error.message)
         }
         console.error('[API] Error creating tag:', error)
         return apiResponse(500, null, error.message)

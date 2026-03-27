@@ -1,4 +1,5 @@
 import { SITE_URL, getPublicationContactInfo, getPublicationLogoUrl, getPublicationSocialProfiles } from '@/lib/site-config'
+import { buildArticleImageUrls } from '@/lib/seo-utils'
 
 export default function StructuredData({ data }) {
   return (
@@ -24,7 +25,7 @@ export function NewsArticleSchema({
     '@type': 'NewsArticle',
     headline: title,
     description,
-    image: image ? [image] : [],
+    image: Array.isArray(image) ? image : (image ? buildArticleImageUrls({ featured_image_url: image, featured_image_alt: title, title }) : []),
     datePublished,
     dateModified: dateModified || datePublished,
     author: {

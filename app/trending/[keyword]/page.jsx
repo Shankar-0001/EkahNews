@@ -1,4 +1,4 @@
-import { createClient as createPublicClient } from '@supabase/supabase-js'
+import { createPublicClient } from '@/lib/supabase/public-server'
 import PublicHeader from '@/components/layout/PublicHeader'
 import StructuredData from '@/components/seo/StructuredData'
 import ArticleMiniCard from '@/components/content/ArticleMiniCard'
@@ -97,38 +97,6 @@ export async function generateMetadata({ params }) {
   }
 }
 
-function buildInternalLinks({ keywordSlug, relatedTopics, latestArticles, explainedArticles, trendingArticles, stories }) {
-  const links = []
-
-  links.push({ href: `/topic/${keywordSlug}`, label: `Topic: ${keywordSlug.replace(/-/g, ' ')}` })
-  links.push({ href: `/explained/${keywordSlug}`, label: `${keywordSlug.replace(/-/g, ' ')} explained` })
-
-  for (const item of relatedTopics || []) {
-    links.push({ href: `/trending/${item.slug}`, label: `Trending ${item.keyword}` })
-    links.push({ href: `/topic/${item.slug}`, label: `Topic ${item.keyword}` })
-  }
-
-  for (const item of latestArticles || []) {
-    links.push({ href: `/${item.categories?.slug || 'news'}/${item.slug}`, label: item.title })
-  }
-  for (const item of explainedArticles || []) {
-    links.push({ href: `/${item.categories?.slug || 'news'}/${item.slug}`, label: item.title })
-  }
-  for (const item of trendingArticles || []) {
-    links.push({ href: `/${item.categories?.slug || 'news'}/${item.slug}`, label: item.title })
-  }
-  for (const story of stories || []) {
-    links.push({ href: `/web-stories/${story.slug}`, label: story.title })
-  }
-
-  const seen = new Set()
-  return links.filter((item) => {
-    if (!item?.href || seen.has(item.href)) return false
-    seen.add(item.href)
-    return true
-  })
-}
-
 export default async function TrendingKeywordPage({ params }) {
   const keywordSlug = decodeURIComponent(params.keyword || '')
   const keyword = keywordSlug.replace(/-/g, ' ').trim()
@@ -220,40 +188,6 @@ export default async function TrendingKeywordPage({ params }) {
     })
     .slice(0, 6)
 
-  const internalLinks = buildInternalLinks({
-    keywordSlug: normalizedRequested,
-    relatedTopics,
-    latestArticles,
-    explainedArticles,
-    trendingArticles,
-    stories: relatedStories,
-  }).slice(0, 8)
-
-  const finalLinks = internalLinks.length >= 6
-    ? internalLinks
-    : [
-        ...internalLinks,
-        { href: '/', label: 'Home' },
-        { href: `/topic/${normalizedRequested}`, label: `Topic ${keyword}` },
-        { href: `/explained/${normalizedRequested}`, label: `${keyword} explained` },
-      ]
-
-  const fillerLinks = [
-    { href: '/', label: 'Home' },
-    { href: `/topic/${normalizedRequested}`, label: `Topic ${keyword}` },
-    { href: `/explained/${normalizedRequested}`, label: `${keyword} explained` },
-    { href: `/trending/${normalizedRequested}`, label: `Trending ${keyword}` },
-    ...(categories || []).slice(0, 8).map((c) => ({ href: `/category/${c.slug}`, label: `${c.name} news` })),
-    { href: '/web-stories', label: 'Top web stories' },
-  ]
-
-  for (const link of fillerLinks) {
-    if (finalLinks.length >= 8) break
-    if (!finalLinks.find((l) => l.href === link.href)) {
-      finalLinks.push(link)
-    }
-  }
-
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'CollectionPage',
@@ -336,17 +270,6 @@ export default async function TrendingKeywordPage({ params }) {
           ) : (
             <p className="text-sm text-gray-600 dark:text-gray-400">No related web stories yet.</p>
           )}
-        </section>
-
-        <section>
-          <h2 className="text-2xl font-semibold mb-4 text-gray-900 dark:text-white">Related Coverage</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {finalLinks.slice(0, 8).map((item, idx) => (
-              <Link key={`${item.href}-${idx}`} href={item.href} className="text-blue-600 dark:text-blue-400 hover:underline">
-                {item.label}
-              </Link>
-            ))}
-          </div>
         </section>
       </main>
     </div>

@@ -25,15 +25,14 @@ export default function SiteFooter() {
   return (
     <footer className="mt-16 border-t border-slate-200 bg-[linear-gradient(180deg,_#0f172a_0%,_#020617_100%)] text-white dark:bg-black">
       <div className="w-full max-w-6xl mx-auto px-4 py-12">
-        <div className="mb-10 rounded-[28px] border border-white/10 bg-white/5 p-6 md:p-8 backdrop-blur-sm">
-          <div className="grid gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)] lg:items-center">
+        <div className="mb-8 border border-white/10 bg-white/5 p-5 md:p-6 backdrop-blur-sm">
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:items-center">
             <div>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 via-cyan-400 to-sky-300 text-slate-950 shadow-lg">
-                  <span className="text-lg font-black">E</span>
-                </div>
+              <div className="mb-3 flex items-center gap-3">
                 <div>
-                  <h3 className="text-2xl font-bold tracking-tight">EkahNews</h3>
+                  <h3 className="text-[1.9rem] font-black tracking-tight text-white">
+                    <span className="text-[#d62828]">Ekah</span>News
+                  </h3>
                   <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Modern Newsroom</p>
                 </div>
               </div>
@@ -42,7 +41,7 @@ export default function SiteFooter() {
               </p>
             </div>
 
-            <div className="rounded-[24px] border border-white/10 bg-slate-950/60 p-5">
+            <div className="border border-white/10 bg-slate-950/60 p-5">
               <div className="flex items-center gap-2 mb-3 text-cyan-300">
                 <Sparkles className="h-4 w-4" />
                 <p className="text-xs font-semibold uppercase tracking-[0.24em]">Newsletter</p>

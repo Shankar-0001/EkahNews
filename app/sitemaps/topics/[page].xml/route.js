@@ -4,29 +4,49 @@ import { urlsetXml, xmlResponse } from '@/lib/sitemap-utils'
 
 const PAGE_SIZE = 1200
 const MIN_MATCH_COUNT = 3
+const MAX_NGRAM_WORDS = 6
+const ARTICLE_LOOKBACK_DAYS = 365
 
 function toPageNumber(raw) {
   const page = Number.parseInt(raw, 10)
   return Number.isFinite(page) && page > 0 ? page : 1
 }
 
-function buildTopicEntries(slug, lastmod, priority = 0.6) {
-  return [{
-    loc: absoluteUrl(`/topic/${slug}`),
-    lastmod,
-    changefreq: 'weekly',
-    priority,
-  }]
-}
-
-function keywordPattern(slug = '') {
-  const cleaned = String(slug)
+function normalizeTopicSlug(slug = '') {
+  return String(slug)
     .replace(/-/g, ' ')
     .replace(/[^a-z0-9\s-]/gi, ' ')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
     .trim()
+}
 
-  if (!cleaned) return null
-  return `%${cleaned}%`
+function tokenize(value = '') {
+  return normalizeTopicSlug(value)
+    .split(' ')
+    .filter(Boolean)
+}
+
+function buildPhraseCountMap(articles = []) {
+  const counts = new Map()
+
+  for (const article of articles) {
+    const tokens = tokenize(`${article.title || ''} ${article.excerpt || ''}`)
+    if (tokens.length === 0) continue
+
+    const seen = new Set()
+    for (let start = 0; start < tokens.length; start += 1) {
+      for (let size = 1; size <= MAX_NGRAM_WORDS && start + size <= tokens.length; size += 1) {
+        seen.add(tokens.slice(start, start + size).join(' '))
+      }
+    }
+
+    for (const phrase of seen) {
+      counts.set(phrase, (counts.get(phrase) || 0) + 1)
+    }
+  }
+
+  return counts
 }
 
 export async function GET(_request, context) {
@@ -34,50 +54,35 @@ export async function GET(_request, context) {
   const from = (page - 1) * PAGE_SIZE
   const to = from + PAGE_SIZE - 1
   const supabase = await createClient()
+  const publishedAfterIso = new Date(Date.now() - ARTICLE_LOOKBACK_DAYS * 24 * 60 * 60 * 1000).toISOString()
 
-  const { data: trendRows } = await supabase
-    .from('trending_topics')
-    .select('slug, updated_at')
-    .order('updated_at', { ascending: false })
-    .range(from, to)
-
-  const eligibleRows = await Promise.all((trendRows || []).map(async (row) => {
-    if (!row?.slug) return null
-
-    const pattern = keywordPattern(row.slug)
-    if (!pattern) return null
-
-    const { count, error } = await supabase
+  const [{ data: trendRows }, { data: articleRows }] = await Promise.all([
+    supabase
+      .from('trending_topics')
+      .select('slug, updated_at')
+      .order('updated_at', { ascending: false })
+      .range(from, to),
+    supabase
       .from('articles')
-      .select('id', { count: 'exact', head: true })
+      .select('title, excerpt')
       .eq('status', 'published')
-      .or(`title.ilike.${pattern},excerpt.ilike.${pattern}`)
+      .gte('published_at', publishedAfterIso),
+  ])
 
-    if (error || (count || 0) < MIN_MATCH_COUNT) {
-      return null
-    }
+  const phraseCountMap = buildPhraseCountMap(articleRows || [])
 
-    return row
-  }))
+  const entries = (trendRows || [])
+    .filter((row) => {
+      const normalizedSlug = normalizeTopicSlug(row?.slug || '')
+      if (!normalizedSlug) return false
+      return (phraseCountMap.get(normalizedSlug) || 0) >= MIN_MATCH_COUNT
+    })
+    .map((row) => ({
+      loc: absoluteUrl(`/topic/${row.slug}`),
+      lastmod: new Date(row.updated_at || Date.now()).toISOString(),
+      changefreq: 'weekly',
+      priority: 0.7,
+    }))
 
-  const topicEntries = eligibleRows
-    .filter(Boolean)
-    .flatMap((row) =>
-      buildTopicEntries(
-        row.slug,
-        new Date(row.updated_at || Date.now()).toISOString(),
-        0.7
-      )
-    )
-
-  const dedup = new Map()
-  for (const entry of topicEntries) {
-    if (!dedup.has(entry.loc)) {
-      dedup.set(entry.loc, entry)
-    }
-  }
-
-  return xmlResponse(urlsetXml([...dedup.values()]))
+  return xmlResponse(urlsetXml(entries))
 }
-
-

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { SITE_URL } from '@/lib/site-config'
+import { createPublicClient } from '@/lib/supabase/public-server'
+import { getArticleCanonicalUrl } from '@/lib/site-config'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,18 +16,13 @@ function escapeXml(value) {
     .replace(/'/g, '&apos;')
 }
 
-function buildCanonicalArticleUrl(article) {
-  const categorySlug = article.categories?.slug || 'news'
-  return `${SITE_URL}/${categorySlug}/${article.slug}`
-}
-
 export async function GET() {
-  const supabase = await createClient()
+  const supabase = createPublicClient()
   const cutoffIso = new Date(Date.now() - NEWS_WINDOW_MS).toISOString()
 
   const { data: articles, error } = await supabase
     .from('articles')
-    .select('slug, title, published_at, categories(slug)')
+    .select('slug, title, canonical_url, published_at, categories(slug)')
     .eq('status', 'published')
     .gte('published_at', cutoffIso)
     .order('published_at', { ascending: false })
@@ -41,7 +36,7 @@ export async function GET() {
   const urls = (articles || [])
     .filter((article) => article?.slug && article?.published_at)
     .map((article) => {
-      const articleUrl = buildCanonicalArticleUrl(article)
+      const articleUrl = getArticleCanonicalUrl(article)
       if (seenUrls.has(articleUrl)) {
         return ''
       }
@@ -80,3 +75,5 @@ export async function GET() {
     },
   })
 }
+
+

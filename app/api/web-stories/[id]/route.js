@@ -6,12 +6,21 @@ import { resolveCanonicalUrl, slugFromText } from '@/lib/site-config'
 import { validateWebStoryPayload } from '@/lib/web-story-validation'
 import { normalizeManualKeywords } from '@/lib/keywords'
 
+
+function normalizeSelectedId(value) {
+  if (!value || value === 'none' || value === 'undefined' || value === 'null') return null
+  return value
+}
+
 function normalizeSlides(slides, storyTitle = '') {
   if (!Array.isArray(slides)) return []
   return slides
     .map((slide) => ({
+      media_type: slide?.media_type === 'video' ? 'video' : 'image',
       image: slide?.image || '',
       image_alt: slide?.image_alt || '',
+      video: slide?.video || '',
+      video_duration: Number(slide?.video_duration) || null,
       headline: slide?.headline || storyTitle || '',
       description: slide?.description || '',
       relatedArticleUrl: slide?.relatedArticleUrl || '',
@@ -20,7 +29,7 @@ function normalizeSlides(slides, storyTitle = '') {
       whatsapp_group_url: slide?.whatsapp_group_url || '',
       seo_description: slide?.seo_description || '',
     }))
-    .filter((slide) => slide.image && (slide.headline || storyTitle))
+    .filter((slide) => (slide.image || slide.video) && (slide.headline || storyTitle))
 }
 
 function deriveStoryCtas(slides = []) {
@@ -126,7 +135,7 @@ export async function PATCH(request, { params }) {
     updates.cta_url = payload.cta_url || null
     updates.whatsapp_group_url = payload.whatsapp_group_url || null
     updates.ad_slot = payload.ad_slot || null
-    if ('category_id' in payload) updates.category_id = payload.category_id || null
+    if ('category_id' in payload) updates.category_id = normalizeSelectedId(payload.category_id)
 
     const requestedStatus = payload.status || existingStory?.status || 'draft'
     updates.status = user.role === 'author'
@@ -141,26 +150,28 @@ export async function PATCH(request, { params }) {
         : null
     }
 
-    if ('author_id' in payload && payload.author_id) {
+    const normalizedAuthorId = normalizeSelectedId(payload.author_id)
+
+    if ('author_id' in payload && normalizedAuthorId) {
       if (user.role === 'admin') {
         const { data: selectedAuthor } = await supabase
           .from('authors')
           .select('id')
-          .eq('id', payload.author_id)
+          .eq('id', normalizedAuthorId)
           .maybeSingle()
         if (!selectedAuthor) return apiResponse(422, null, 'Selected author not found')
-        updates.author_id = payload.author_id
+        updates.author_id = normalizedAuthorId
       } else {
         const { data: selectedAuthor } = await supabase
           .from('authors')
           .select('id, user_id')
-          .eq('id', payload.author_id)
+          .eq('id', normalizedAuthorId)
           .maybeSingle()
         if (!selectedAuthor) return apiResponse(422, null, 'Selected author not found')
         if (selectedAuthor.user_id !== user.userId) {
           return apiResponse(403, null, 'Authors can only select their own author profile')
         }
-        updates.author_id = payload.author_id
+        updates.author_id = normalizedAuthorId
       }
     }
 
@@ -173,7 +184,7 @@ export async function PATCH(request, { params }) {
       updates.cta_url = storyCtas.cta_url
       updates.whatsapp_group_url = storyCtas.whatsapp_group_url
       updates.slides = slides
-      if (!updates.cover_image) updates.cover_image = slides[0].image
+      if (!updates.cover_image) updates.cover_image = slides[0].image || existingStory?.cover_image || ''
       if (!updates.title) updates.title = effectiveTitle || slides[0].headline
       if (!updates.slug) updates.slug = slugFromText(updates.title)
       if (!updates.seo_description) {
@@ -201,7 +212,15 @@ export async function PATCH(request, { params }) {
       status: updates.status,
     })
     if (!validation.valid) {
-      return apiResponse(422, null, validation.issues[0])
+      console.warn('Web story update validation failed', {
+        storyId: params.id,
+        status: updates.status,
+        issues: validation.issues,
+      })
+      return apiResponse(422, null, {
+        message: validation.issues[0],
+        issues: validation.issues,
+      })
     }
 
     const { data, error } = await supabase
@@ -244,5 +263,14 @@ export async function DELETE(_request, { params }) {
     return apiResponse(500, null, error.message || 'Failed to delete story')
   }
 }
+
+
+
+
+
+
+
+
+
 
 

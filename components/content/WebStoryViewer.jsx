@@ -8,17 +8,49 @@ import { getAnchorPropsForHref } from '@/lib/link-policy'
 
 const AUTO_MS = 5000
 
+function formatStoryTime(value) {
+  if (!value) return ''
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return ''
+  return parsed.toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+function getSlideDuration(slide) {
+  if (slide?.media_type === 'video') {
+    const seconds = Number(slide?.video_duration)
+    if (Number.isFinite(seconds) && seconds > 0) {
+      return Math.round(seconds * 1000)
+    }
+  }
+  return AUTO_MS
+}
+
 export default function WebStoryViewer({ story, articleUrl }) {
-  const slides = useMemo(() => (Array.isArray(story?.slides) ? story.slides : []), [story])
+  const slides = useMemo(() => {
+    const storySlides = Array.isArray(story?.slides) ? story.slides.filter((slide) => slide?.image || slide?.video) : []
+    const coverSlide = {
+      image: story?.cover_image || storySlides[0]?.image || '',
+      image_alt: story?.cover_image_alt || story?.title || 'Web story cover',
+      isCover: true,
+    }
+    return [coverSlide, ...storySlides]
+  }, [story])
   const [index, setIndex] = useState(0)
   const [metrics, setMetrics] = useState({ views: 0, likes: 0, shares: 0 })
   const [touchStartX, setTouchStartX] = useState(null)
 
   const authorName = story?.authors?.name || 'EkahNews'
+  const categoryName = story?.categories?.name || 'News'
+  const storyTime = formatStoryTime(story?.published_at || story?.updated_at)
   const current = slides[index] || {}
-  const isCoverSlide = index === 0
+  const isCoverSlide = Boolean(current?.isCover)
   const isWhatsappSlide = Boolean(current?.whatsapp_group_url)
-  const isReadMoreSlide = !isWhatsappSlide && Boolean(current?.cta_text || current?.cta_url)
+  const isReadMoreSlide = !isCoverSlide && !isWhatsappSlide && Boolean(current?.cta_text || current?.cta_url)
+  const isVideoSlide = !isCoverSlide && current?.media_type === 'video' && current?.video
   const progressWidth = `${((index + 1) / Math.max(1, slides.length)) * 100}%`
   const ctaHref = current?.cta_url || articleUrl || '#'
   const ctaLinkProps = getAnchorPropsForHref(ctaHref)
@@ -42,9 +74,9 @@ export default function WebStoryViewer({ story, articleUrl }) {
     if (slides.length < 2) return
     const timer = setTimeout(() => {
       setIndex((prev) => (prev + 1) % slides.length)
-    }, AUTO_MS)
+    }, getSlideDuration(current))
     return () => clearTimeout(timer)
-  }, [index, slides.length])
+  }, [current, index, slides.length])
 
   const handleLike = async () => {
     const response = await fetch('/api/engagement', {
@@ -77,7 +109,18 @@ export default function WebStoryViewer({ story, articleUrl }) {
           setTouchStartX(null)
         }}
       >
-        {current?.image ? (
+        {isVideoSlide ? (
+          <video
+            key={current.video}
+            src={current.video}
+            poster={current.image || story?.cover_image || ''}
+            className="h-full w-full object-cover"
+            autoPlay
+            muted
+            playsInline
+            preload="metadata"
+          />
+        ) : current?.image ? (
           <Image
             src={current.image}
             alt={current.image_alt || story.title}
@@ -94,27 +137,20 @@ export default function WebStoryViewer({ story, articleUrl }) {
         <button className="absolute inset-y-0 right-0 w-1/2" onClick={next} aria-label="Next slide" />
 
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/55 to-transparent p-4 text-white">
-          <div className="mb-2 flex items-center justify-between gap-2 text-xs text-gray-200">
-            <span>{isCoverSlide ? authorName : `Slide ${index + 1}`}</span>
-            <span>Slide {index + 1} of {slides.length}</span>
-          </div>
-
-          {isCoverSlide && !isReadMoreSlide && !isWhatsappSlide && (
+          {isCoverSlide && (
             <>
               <h2 className="text-lg font-bold leading-snug">{story.title}</h2>
-              <p className="mt-1 text-sm text-gray-200">{authorName}</p>
+              <p className="mt-2 text-sm text-gray-200">{`${authorName} | ${categoryName}`}</p>
+              {storyTime ? <p className="mt-1 text-xs text-gray-300">{storyTime}</p> : null}
             </>
           )}
 
-          {!isReadMoreSlide && !isWhatsappSlide && current?.description && (
-            <p className="mt-2 text-sm leading-6 text-gray-100">{current.description}</p>
+          {!isCoverSlide && !isReadMoreSlide && !isWhatsappSlide && current?.description && (
+            <p className="text-sm leading-6 text-gray-100">{current.description}</p>
           )}
 
           {isReadMoreSlide && (
-            <div className="mt-3 space-y-3 text-center">
-              {current?.description && (
-                <p className="text-sm leading-6 text-gray-100">{current.description}</p>
-              )}
+            <div className="mt-3 text-center">
               <a
                 href={ctaHref}
                 {...ctaLinkProps}
@@ -126,10 +162,7 @@ export default function WebStoryViewer({ story, articleUrl }) {
           )}
 
           {isWhatsappSlide && (
-            <div className="mt-3 space-y-3 text-center">
-              {current?.description && (
-                <p className="text-sm leading-6 text-gray-100">{current.description}</p>
-              )}
+            <div className="mt-3 text-center">
               {current.whatsapp_group_url ? (
                 <a
                   href={current.whatsapp_group_url}

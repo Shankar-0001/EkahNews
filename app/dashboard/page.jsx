@@ -59,7 +59,7 @@ export default async function DashboardPage() {
   }
   const engagementMap = new Map((engagementRows || []).map((row) => [
     row.article_id,
-    {
+    {       
       views: row.views || 0,
       likes: row.likes || 0,
       shares: row.shares || 0,

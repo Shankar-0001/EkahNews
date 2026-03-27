@@ -6,6 +6,56 @@ import { parseStructuredDataOverride } from '@/lib/seo-utils'
 
 export const config = { amp: true }
 
+const AMP_CUSTOM_CSS = `
+  amp-story {
+    font-family: Arial, sans-serif;
+    color: #fff;
+    background: #020617;
+  }
+  .scrim {
+    background: linear-gradient(180deg, rgba(2, 6, 23, 0.08) 0%, rgba(2, 6, 23, 0.24) 32%, rgba(2, 6, 23, 0.88) 100%);
+  }
+  .slide-shell {
+    align-content: end;
+    padding: 0 26px 34px;
+  }
+  .headline {
+    font-size: 34px;
+    line-height: 1.05;
+    font-weight: 800;
+    margin: 0 0 14px;
+  }
+  .meta {
+    font-size: 12px;
+    line-height: 1.5;
+    opacity: 0.82;
+  }
+  .body {
+    font-size: 18px;
+    line-height: 1.6;
+    margin: 0;
+  }
+  .cta-shell {
+    align-content: center;
+    text-align: center;
+    padding: 0 28px;
+  }
+  .cta-hint {
+    display: inline-block;
+    background: rgba(37, 99, 235, 0.92);
+    color: #fff;
+    padding: 14px 22px;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .cta-hint.whatsapp {
+    background: rgba(22, 163, 74, 0.92);
+  }
+`
+
 function getSupabase() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -34,7 +84,7 @@ function getProductionHostname() {
 }
 
 function getSlides(story) {
-  return Array.isArray(story?.slides) ? story.slides.filter((slide) => slide?.image) : []
+  return Array.isArray(story?.slides) ? story.slides.filter((slide) => slide?.image || slide?.video) : []
 }
 
 function getDescription(story, slides) {
@@ -60,7 +110,7 @@ function buildSchemas(story, slides, canonical) {
     '@type': 'NewsArticle',
     headline: story.seo_title || story.title,
     description,
-    image: story.cover_image ? [story.cover_image] : slides.slice(0, 4).map((slide) => slide.image),
+    image: story.cover_image ? [story.cover_image] : slides.slice(0, 4).map((slide) => slide.image).filter(Boolean),
     datePublished: story.published_at || story.updated_at,
     dateModified: story.updated_at || story.published_at,
     author: {
@@ -109,6 +159,44 @@ function buildAmpAnalyticsConfig(measurementId) {
   }
 }
 
+function buildAmpStoryAdsConfig() {
+  const network = (process.env.NEXT_PUBLIC_WEB_STORY_AD_NETWORK || '').trim().toLowerCase()
+
+  if (network === 'adsense') {
+    const adClient = (process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID || '').trim()
+    const adSlot = (process.env.NEXT_PUBLIC_WEB_STORY_ADSENSE_SLOT || '').trim()
+
+    if (!adClient || !adSlot) {
+      return null
+    }
+
+    return {
+      'ad-attributes': {
+        type: 'adsense',
+        'data-ad-client': adClient,
+        'data-ad-slot': adSlot,
+      },
+    }
+  }
+
+  if (network === 'doubleclick') {
+    const adSlot = (process.env.NEXT_PUBLIC_WEB_STORY_DOUBLECLICK_SLOT || '').trim()
+
+    if (!adSlot) {
+      return null
+    }
+
+    return {
+      'ad-attributes': {
+        type: 'doubleclick',
+        'data-slot': adSlot,
+      },
+    }
+  }
+
+  return null
+}
+
 export async function getServerSideProps({ params, req, res }) {
   try {
     const supabase = getSupabase()
@@ -152,6 +240,8 @@ export default function WebStoryAmpPage({ story, gaMeasurementId }) {
     : ''
   const schemas = buildSchemas(story, slides, canonical)
   const analyticsConfig = gaMeasurementId ? buildAmpAnalyticsConfig(gaMeasurementId) : null
+  const ampStoryAdsConfig = buildAmpStoryAdsConfig()
+  const canShowStoryAds = Boolean(ampStoryAdsConfig && (slides.length + 1) >= 7)
 
   return (
     <>
@@ -171,150 +261,93 @@ export default function WebStoryAmpPage({ story, gaMeasurementId }) {
         {story.cover_image ? <meta name="twitter:image" content={story.cover_image} /> : null}
         {story.cover_image_alt ? <meta name="twitter:image:alt" content={story.cover_image_alt} /> : null}
         <link rel="canonical" href={canonical} />
-        <script async key="amp-story" custom-element="amp-story" src="https://cdn.ampproject.org/v0/amp-story-1.0.js" />
-        {gaMeasurementId ? <script async key="amp-analytics" custom-element="amp-analytics" src="https://cdn.ampproject.org/v0/amp-analytics-0.1.js" /> : null}
+
         <script key="schema-primary" type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schemas.primary) }} />
         <script key="schema-breadcrumb" type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schemas.breadcrumb) }} />
-        <style amp-custom>{`
-          amp-story {
-            font-family: Arial, sans-serif;
-            color: #fff;
-            background: #020617;
-          }
-          .scrim {
-            background: linear-gradient(180deg, rgba(2, 6, 23, 0.08) 0%, rgba(2, 6, 23, 0.24) 32%, rgba(2, 6, 23, 0.88) 100%);
-          }
-          .slide-shell {
-            align-content: end;
-            padding: 0 26px 34px;
-          }
-          .eyebrow {
-            font-size: 12px;
-            letter-spacing: 0.18em;
-            text-transform: uppercase;
-            opacity: 0.84;
-          }
-          .headline {
-            font-size: 34px;
-            line-height: 1.05;
-            font-weight: 800;
-            margin: 0 0 14px;
-          }
-          .meta {
-            font-size: 12px;
-            line-height: 1.5;
-            opacity: 0.82;
-          }
-          .body {
-            font-size: 18px;
-            line-height: 1.6;
-            margin: 0;
-          }
-          .cta-shell {
-            align-content: center;
-            text-align: center;
-            padding: 0 28px;
-          }
-          .chip {
-            display: inline-block;
-            padding: 6px 12px;
-            border-radius: 999px;
-            background: rgba(255, 255, 255, 0.14);
-            font-size: 12px;
-            letter-spacing: 0.12em;
-            text-transform: uppercase;
-          }
-          .cta-title {
-            font-size: 36px;
-            line-height: 1.05;
-            font-weight: 800;
-            margin: 14px 0;
-          }
-          .cta-copy {
-            font-size: 18px;
-            line-height: 1.6;
-            margin: 0 auto 18px;
-            max-width: 540px;
-          }
-          .cta-button {
-            display: inline-block;
-            background: #2563eb;
-            color: #fff;
-            padding: 14px 22px;
-            border-radius: 999px;
-            font-size: 14px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            text-decoration: none;
-          }
-          .cta-hint {
-            display: inline-block;
-            background: rgba(37, 99, 235, 0.92);
-            color: #fff;
-            padding: 14px 22px;
-            border-radius: 999px;
-            font-size: 14px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-          }
-          .cta-hint.whatsapp {
-            background: rgba(22, 163, 74, 0.92);
-          }
-        `}</style>
       </Head>
 
+      <style jsx global>{AMP_CUSTOM_CSS}</style>
+
       <amp-story
-        standalone
+        standalone=""
         title={story.title}
         publisher="EkahNews"
         publisher-logo-src={logoUrl}
         poster-portrait-src={story.cover_image}
         poster-square-src={story.cover_image}
         poster-landscape-src={story.cover_image}
-        supports-landscape
       >
+        {canShowStoryAds ? (
+          <amp-story-auto-ads>
+            <script type="application/json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ampStoryAdsConfig) }} />
+          </amp-story-auto-ads>
+        ) : null}
+        <amp-story-page id="cover" auto-advance-after="7s">
+          <amp-story-grid-layer template="fill">
+            <amp-img
+              src={story.cover_image || slides[0]?.image}
+              width="720"
+              height="1280"
+              layout="responsive"
+              alt={story.cover_image_alt || story.title}
+            />
+          </amp-story-grid-layer>
+
+          <amp-story-grid-layer template="vertical" class="scrim slide-shell">
+            <h1 className="headline">{story.title}</h1>
+            <p className="meta">{`${story.authors?.name || 'EkahNews'} | ${story.categories?.name || 'News'}`}</p>
+          </amp-story-grid-layer>
+        </amp-story-page>
+
         {slides.map((slide, index) => {
           const isCtaSlide = Boolean(slide?.cta_url || slide?.cta_text || slide?.whatsapp_group_url)
-          const pageId = `page-${index + 1}`
+          const isVideoSlide = slide?.media_type === 'video' && slide?.video
+          const pageId = `page-${index + 2}`
+          const mediaId = `media-${index + 2}`
           const ctaHref = slide?.whatsapp_group_url || slide?.cta_url || articleUrl || ''
           const ctaText = slide?.whatsapp_group_url ? 'Join WhatsApp Community' : (slide?.cta_text || 'Read Full Story')
 
           return (
-            <amp-story-page id={pageId} key={pageId} auto-advance-after="7s">
+            <amp-story-page id={pageId} key={pageId} auto-advance-after={isVideoSlide ? mediaId : '7s'}>
               <amp-story-grid-layer template="fill">
-                <amp-img
-                  src={slide.image}
-                  width="720"
-                  height="1280"
-                  layout="responsive"
-                  alt={slide.image_alt || story.cover_image_alt || story.title}
-                />
+                {isVideoSlide ? (
+                  <amp-video
+                    id={mediaId}
+                    src={slide.video}
+                    poster={slide.image || story.cover_image}
+                    width="720"
+                    height="1280"
+                    layout="responsive"
+                    autoplay=""
+                  />
+                ) : (
+                  <amp-img
+                    src={slide.image}
+                    width="720"
+                    height="1280"
+                    layout="responsive"
+                    alt={slide.image_alt || story.cover_image_alt || story.title}
+                  />
+                )}
               </amp-story-grid-layer>
 
               <amp-story-grid-layer template="vertical" class="scrim slide-shell">
                 {!isCtaSlide ? (
-                  <>
-                    <div className="eyebrow">{index === 0 ? 'Web Story' : `Slide ${index + 1}`}</div>
-                    <h1 className="headline">{index === 0 ? story.title : (slide.headline || story.title)}</h1>
-                    <p className="body">{slide.description || description}</p>
-                    <p className="meta">{story.authors?.name || 'EkahNews'} | {story.categories?.name || 'News'}</p>
-                  </>
+                  <p className="body">{slide.description || description}</p>
                 ) : (
                   <div className="cta-shell">
-                    <div className="chip">Continue</div>
-                    <h2 className="cta-title">{slide.headline || story.title}</h2>
-                    <p className="cta-copy">{slide.description || description}</p>
                     {ctaHref ? (
-                      <>
-                        <p className={`cta-hint${slide?.whatsapp_group_url ? ' whatsapp' : ''}`}>{ctaText}</p>
-                        <amp-story-page-outlink layout="nodisplay" href={ctaHref} />
-                      </>
+                      <p className={`cta-hint${slide?.whatsapp_group_url ? ' whatsapp' : ''}`}>{ctaText}</p>
                     ) : null}
                   </div>
                 )}
               </amp-story-grid-layer>
+
+              {ctaHref ? (
+                <amp-story-page-outlink layout="nodisplay">
+                  <a href={ctaHref} title={ctaText}>{ctaText}</a>
+                </amp-story-page-outlink>
+              ) : null}
             </amp-story-page>
           )
         })}

@@ -1,10 +1,10 @@
-import { createClient } from '@/lib/supabase/server'
+import { createPublicClient } from '@/lib/supabase/public-server'
 import { getArticleCanonicalUrl, SITE_URL } from '@/lib/site-config'
 
 export const revalidate = 3600
 
 export default async function sitemap() {
-  const supabase = await createClient()
+  const supabase = createPublicClient()
 
   const [
     { data: categories },
@@ -39,35 +39,35 @@ export default async function sitemap() {
       .in('id', tagIds)
     : { data: [] }
 
-  const categoryHubEntries = categories?.map((category) => ({
+  const categoryHubEntries = categories?.filter((category) => category?.slug).map((category) => ({
     url: `${SITE_URL}/category/${category.slug}`,
     lastModified: new Date(category.updated_at),
     changeFrequency: 'daily',
     priority: 0.7,
   })) || []
 
-  const tagEntries = tags?.map((tag) => ({
+  const tagEntries = tags?.filter((tag) => tag?.slug).map((tag) => ({
     url: `${SITE_URL}/tags/${tag.slug}`,
     lastModified: new Date(tag.updated_at),
     changeFrequency: 'weekly',
     priority: 0.5,
   })) || []
 
-  const articleEntries = articles?.map((article) => ({
+  const articleEntries = articles?.filter((article) => article?.slug).map((article) => ({
     url: getArticleCanonicalUrl(article),
     lastModified: new Date(article.updated_at || article.published_at || Date.now()),
     changeFrequency: 'daily',
     priority: 0.8,
   })) || []
 
-  const storyEntries = stories?.map((story) => ({
+  const storyEntries = stories?.filter((story) => story?.slug).map((story) => ({
     url: `${SITE_URL}/web-stories/${story.slug}`,
     lastModified: new Date(story.updated_at || story.published_at || Date.now()),
     changeFrequency: 'daily',
     priority: 0.6,
   })) || []
 
-  return [
+  const entries = [
     {
       url: SITE_URL,
       lastModified: new Date(),
@@ -127,4 +127,14 @@ export default async function sitemap() {
     ...tagEntries,
     ...storyEntries,
   ]
+
+  const deduped = new Map()
+  for (const entry of entries) {
+    if (!entry?.url || deduped.has(entry.url)) continue
+    deduped.set(entry.url, entry)
+  }
+
+  return [...deduped.values()]
 }
+
+

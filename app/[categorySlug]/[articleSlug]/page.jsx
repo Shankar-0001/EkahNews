@@ -1,5 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
-import { notFound } from 'next/navigation'
+import { createPublicClient } from '@/lib/supabase/public-server'
+import { notFound, permanentRedirect } from 'next/navigation'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -10,15 +10,17 @@ import Image from 'next/image'
 import PublicHeader from '@/components/layout/PublicHeader'
 import StructuredData from '@/components/seo/StructuredData'
 import { InArticleAd } from '@/components/ads/AdComponent'
-import { generateArticleSchemas } from '@/lib/seo-utils'
+import AdPlaceholder from '@/components/common/AdPlaceholder'
+import { buildArticleImageVariants, generateArticleSchemas } from '@/lib/seo-utils'
 import { calculateReadingTime, generateSixtySecondSummary, generateAeoSnapshot } from '@/lib/content-utils'
 import ReadingProgressBar from '@/components/article/ReadingProgressBar'
 import StickyShareBar from '@/components/article/StickyShareBar'
 import ArticleSummaryToggles from '@/components/article/ArticleSummaryToggles'
 import ArticleMiniCard from '@/components/content/ArticleMiniCard'
+import Breadcrumb from '@/components/common/Breadcrumb'
 import SafeHtml from '@/components/SafeHtml'
 import { buildLanguageAlternates, getArticleCanonicalUrl, SITE_URL, slugFromText } from '@/lib/site-config'
-import { buildArticleKeywords, keywordsToMetadataValue, keywordsToTopicLinks } from '@/lib/keywords'
+import { buildArticleKeywords, keywordsToMetadataValue } from '@/lib/keywords'
 import { parseStructuredDataOverride } from '@/lib/seo-utils'
 
 export const revalidate = 1800
@@ -44,7 +46,7 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }) {
   try {
-    const supabase = await createClient()
+    const supabase = createPublicClient()
     const { articleSlug } = params
 
     const { data: article } = await supabase
@@ -81,6 +83,22 @@ export async function generateMetadata({ params }) {
       }
     }
 
+    let metadataImageMeta = null
+    if (article.featured_image_url) {
+      const { data: mediaRow } = await supabase
+        .from('media_library')
+        .select('original_width, original_height')
+        .eq('file_url', article.featured_image_url)
+        .maybeSingle()
+      metadataImageMeta = mediaRow || null
+    }
+
+    const articleForMetadata = {
+      ...article,
+      featured_image_width: metadataImageMeta?.original_width || null,
+      featured_image_height: metadataImageMeta?.original_height || null,
+    }
+
     const siteUrl = SITE_URL
     const articleUrl = getArticleCanonicalUrl(article)
     const keywords = buildArticleKeywords(article)
@@ -101,19 +119,19 @@ export async function generateMetadata({ params }) {
         publishedTime: article.published_at,
         modifiedTime: article.updated_at,
         authors: article.authors?.name ? [article.authors.name] : [],
-        images: article.featured_image_url ? [{
-          url: article.featured_image_url,
-          width: 1200,
-          height: 630,
-          alt: article.title,
-        }] : [],
+        images: buildArticleImageVariants(articleForMetadata).map((image) => ({
+          url: image.url,
+          width: image.width,
+          height: image.height,
+          alt: image.caption,
+        })),
         url: articleUrl,
       },
       twitter: {
         card: 'summary_large_image',
         title: article.seo_title || article.title,
         description: article.seo_description || article.excerpt,
-        images: article.featured_image_url ? [article.featured_image_url] : [],
+        images: buildArticleImageVariants(articleForMetadata).map((image) => image.url),
       },
       alternates: {
         canonical: articleUrl,
@@ -136,7 +154,7 @@ export async function generateMetadata({ params }) {
 
 export default async function ArticlePage({ params }) {
   try {
-    const supabase = await createClient()
+    const supabase = createPublicClient()
     const { categorySlug, articleSlug } = params
     const siteUrl = SITE_URL
 
@@ -173,10 +191,21 @@ export default async function ArticlePage({ params }) {
     }
 
     if (article.categories?.slug && article.categories.slug !== categorySlug) {
-      notFound()
+      permanentRedirect(`/${article.categories.slug}/${article.slug}`)
     }
 
     let authorProfile = article.authors || null
+    let featuredImageMeta = null
+
+    if (article.featured_image_url) {
+      const { data: mediaRow } = await supabase
+        .from('media_library')
+        .select('original_width, original_height')
+        .eq('file_url', article.featured_image_url)
+        .maybeSingle()
+      featuredImageMeta = mediaRow || null
+    }
+
     if (
       (
         !authorProfile?.bio
@@ -333,14 +362,18 @@ export default async function ArticlePage({ params }) {
       || slugFromText(authorProfile?.name || article.authors?.name || '')
       || article.authors?.id
 
+    const articleWithImageMeta = {
+      ...article,
+      featured_image_width: featuredImageMeta?.original_width || null,
+      featured_image_height: featuredImageMeta?.original_height || null,
+    }
+
     const readingTimeMinutes = calculateReadingTime(article.content || '')
     const summaryPoints = generateSixtySecondSummary(article)
     const aeoSnapshot = generateAeoSnapshot(article)
-    const articleKeywords = buildArticleKeywords(article)
-    const keywordTopicLinks = keywordsToTopicLinks(articleKeywords)
     const structuredOverride = parseStructuredDataOverride(article.structured_data)
     const schemas = generateArticleSchemas({
-      article,
+      article: articleWithImageMeta,
       articleUrl,
       readingTimeMinutes,
       structuredOverride,
@@ -359,91 +392,99 @@ export default async function ArticlePage({ params }) {
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
           <PublicHeader categories={categories || []} />
 
-          <article className="w-full max-w-6xl mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8 pb-16 md:pb-10">
+          <article className="w-full max-w-6xl mx-auto px-4 py-6 pb-16 md:py-8 md:pb-10 lg:px-8">
             <ReadingProgressBar />
             <StickyShareBar articleUrl={articleUrl} articleTitle={article.title} />
-
-            <div className="mb-8 rounded-[32px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(37,99,235,0.12),_transparent_34%),linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)] p-5 md:p-8 shadow-sm dark:border-slate-800 dark:bg-[radial-gradient(circle_at_top_left,_rgba(96,165,250,0.14),_transparent_24%),linear-gradient(180deg,_#0f172a_0%,_#020617_100%)]">
-              <div className="grid gap-8 xl:grid-cols-[minmax(0,1.1fr)_360px] xl:items-start">
-                <div className="max-w-[860px]">
-                  <div className="flex flex-wrap items-center gap-3 mb-5">
-                    {article.categories && (
-                      <Link href={`/category/${article.categories.slug}`}>
-                        <Badge className="bg-blue-600 hover:bg-blue-700 text-white border-0 px-3 py-1">{article.categories.name}</Badge>
-                      </Link>
-                    )}
-                    <Badge variant="secondary" className="px-3 py-1">{readingTimeMinutes} min read</Badge>
-                  </div>
-
-                  <h1 className="text-[32px] leading-[1.05] font-extrabold text-gray-900 dark:text-white mb-5 md:text-[56px] tracking-tight max-w-4xl">
-                    {article.title}
-                  </h1>
-
-                  {article.excerpt && (
-                    <p className="text-[19px] text-gray-700 dark:text-gray-300 mb-6 leading-[1.8] max-w-3xl">
-                      {article.excerpt}
-                    </p>
-                  )}
-
-                  <div className="flex flex-wrap items-center gap-4 md:gap-6 rounded-[24px] border border-slate-200 bg-white/85 px-4 py-4 text-sm text-gray-600 shadow-sm dark:border-slate-800 dark:bg-slate-900/70 dark:text-gray-400">
-                    <div className="flex items-center gap-3 min-w-[220px]">
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage src={authorProfile?.avatar_url || ''} />
-                        <AvatarFallback>
-                          {(authorProfile?.name || article.authors?.name || '').split(' ').map((n) => n[0]).join('')}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex flex-col">
-                        <span className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">By</span>
-                        <Link href={`/authors/${authorLinkSlug}`}>
-                          <strong className="text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 hover:underline cursor-pointer">{authorProfile?.name || article.authors?.name}</strong>
-                        </Link>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4" />
-                      <time dateTime={article.published_at}>
-                        Published {format(new Date(article.published_at), 'MMMM d, yyyy')}
-                      </time>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      <span>{formatDistanceToNow(new Date(article.published_at), { addSuffix: true })}</span>
-                    </div>
-                    {article.updated_at !== article.published_at && (
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4" />
-                        <time dateTime={article.updated_at}>
-                          Updated {format(new Date(article.updated_at), 'MMMM d, yyyy')}
-                        </time>
-                      </div>
-                    )}
-                  </div>
-
-                </div>
-
-                <div className="space-y-4">
-                  {article.featured_image_url && (
-                    <div className="relative aspect-[4/3] overflow-hidden rounded-[26px] border border-slate-200 shadow-sm dark:border-slate-800">
-                      <Image
-                        src={article.featured_image_url}
-                        alt={article.featured_image_alt || article.title}
-                        fill
-                        className="object-cover"
-                        priority
-                        sizes="(max-width: 1280px) 100vw, 360px"
-                      />
-                    </div>
-                  )}
-
-                </div>
-              </div>
+            <div className="mb-6">
+              <Breadcrumb
+                items={[
+                  { label: article.categories?.name || 'News', href: `/category/${article.categories?.slug || 'news'}` },
+                  { label: article.title, href: `/${article.categories?.slug || 'news'}/${article.slug}` },
+                ]}
+              />
             </div>
 
-            <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_320px] items-start">
-              <div>
-                <Card className="rounded-[28px] p-3 sm:p-4 md:p-6 lg:p-8 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-                  <div className="mx-auto max-w-[720px]">
+            <header className="mb-8 border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(37,99,235,0.12),_transparent_30%),linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)] p-5 shadow-sm dark:border-slate-800 dark:bg-[radial-gradient(circle_at_top_left,_rgba(96,165,250,0.14),_transparent_24%),linear-gradient(180deg,_#0f172a_0%,_#020617_100%)] md:p-8">
+              <div className="mx-auto max-w-4xl">
+                <div className="flex flex-wrap items-center gap-3">
+                  {article.categories && (
+                    <Link href={`/category/${article.categories.slug}`}>
+                      <Badge className="border-0 bg-[#d62828] px-3 py-1 text-white hover:bg-[#b61f1f]">
+                        {article.categories.name}
+                      </Badge>
+                    </Link>
+                  )}
+                  <Badge variant="secondary" className="px-3 py-1">
+                    {readingTimeMinutes} min read
+                  </Badge>
+                </div>
+
+                <h1 className="mt-5 max-w-4xl text-[34px] font-extrabold leading-[1.03] tracking-tight text-slate-900 dark:text-white md:text-[58px]">
+                  {article.title}
+                </h1>
+
+                {article.excerpt && (
+                  <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-700 dark:text-slate-300">
+                    {article.excerpt}
+                  </p>
+                )}
+
+                <div className="mt-6 flex flex-wrap items-center gap-4 border border-slate-200 bg-white/85 px-4 py-4 text-sm text-slate-600 shadow-sm dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-400 md:gap-6">
+                  <div className="flex min-w-0 flex-1 items-center gap-3 sm:min-w-[220px]">
+                    <Avatar className="h-11 w-11">
+                      <AvatarImage src={authorProfile?.avatar_url || ''} />
+                      <AvatarFallback>
+                        {(authorProfile?.name || article.authors?.name || '').split(' ').map((n) => n[0]).join('')}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex flex-col">
+                      <span className="text-xs uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">Byline</span>
+                      <Link href={`/authors/${authorLinkSlug}`} className="font-semibold text-slate-900 hover:text-[#d62828] hover:underline dark:text-white dark:hover:text-red-400">
+                        {authorProfile?.name || article.authors?.name}
+                      </Link>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    <time dateTime={article.published_at}>
+                      Published {format(new Date(article.published_at), 'MMMM d, yyyy')}
+                    </time>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    <span>{formatDistanceToNow(new Date(article.published_at), { addSuffix: true })}</span>
+                  </div>
+                  {article.updated_at !== article.published_at && (
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      <time dateTime={article.updated_at}>
+                        Updated {format(new Date(article.updated_at), 'MMMM d, yyyy')}
+                      </time>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </header>
+
+            {article.featured_image_url && (
+              <figure className="mb-10 overflow-hidden border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div className="relative aspect-[16/9] w-full overflow-hidden bg-slate-100 dark:bg-slate-800">
+                  <Image
+                    src={article.featured_image_url}
+                    alt={article.featured_image_alt || article.title}
+                    fill
+                    priority
+                    className="object-cover"
+                    sizes="(max-width: 1280px) 100vw, 1200px"
+                  />
+                </div>
+              </figure>
+            )}
+
+            <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="space-y-8">
+                <Card className="border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:p-6 lg:p-8">
+                  <div className="mx-auto max-w-[740px]">
                     <ArticleSummaryToggles
                       summaryPoints={summaryPoints}
                       aeoSnapshot={aeoSnapshot}
@@ -452,36 +493,21 @@ export default async function ArticlePage({ params }) {
                       articleTitle={article.title}
                     />
 
-                    {article.featured_image_url && (
-                      <div className="mb-8 mt-8 rounded-[24px] overflow-hidden relative w-full aspect-video md:aspect-[21/9]">
-                        <Image
-                          src={article.featured_image_url}
-                          alt={article.featured_image_alt || article.title}
-                          fill
-                          className="object-cover"
-                          sizes="(max-width: 768px) 100vw, 760px"
-                          loading="lazy"
-                        />
-                      </div>
-                    )}
-
-                    <div className="space-y-6">
-                      <SafeHtml
-                        html={article.content || ''}
-                        baseUrl={siteUrl}
-                        className="article-content prose prose-slate dark:prose-invert mb-8 max-w-none"
-                      />
-                    </div>
-
-                    <InArticleAd />
+                    <SafeHtml
+                      html={article.content || ''}
+                      baseUrl={siteUrl}
+                      className="article-content prose prose-lg prose-slate max-w-none prose-headings:scroll-mt-28 prose-headings:font-bold prose-h2:mt-10 prose-h2:text-2xl prose-h3:mt-8 prose-h3:text-xl prose-p:leading-8 prose-li:leading-7 prose-strong:text-slate-900 dark:prose-invert dark:prose-strong:text-white"
+                    />
 
                     {article.article_tags && article.article_tags.length > 0 && (
-                      <div className="mt-12 pt-8 border-t dark:border-gray-700">
-                        <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase">Tagged</h3>
-                        <div className="flex flex-wrap gap-2">
+                      <div className="mt-10 border-t border-slate-200 pt-8 dark:border-slate-800">
+                        <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                          Story Tags
+                        </h2>
+                        <div className="mt-4 flex flex-wrap gap-2">
                           {article.article_tags.map((at) => (
                             <Link key={at.tags.slug} href={`/tags/${at.tags.slug}`}>
-                              <Badge variant="outline" className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
+                              <Badge variant="outline" className="cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800">
                                 {at.tags.name}
                               </Badge>
                             </Link>
@@ -489,84 +515,117 @@ export default async function ArticlePage({ params }) {
                         </div>
                       </div>
                     )}
-
-                    {keywordTopicLinks.length > 0 && (
-                      <div className="mt-8">
-                        <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase">Related Keywords</h3>
-                        <div className="flex flex-wrap gap-2">
-                          {keywordTopicLinks.map((item) => (
-                            <Link key={item.slug} href={`/topic/${item.slug}`}>
-                              <Badge variant="outline" className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
-                                {item.keyword}
-                              </Badge>
-                            </Link>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              </div>
-
-              <aside className="space-y-6 xl:sticky xl:top-28">
-                <Card className="rounded-[24px] dark:bg-gray-800 dark:border-gray-700 shadow-sm">
-                  <div className="p-6">
-                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">Explore Sections</p>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {(categories || []).slice(0, 10).map((item) => (
-                        <Link
-                          key={item.id}
-                          href={`/category/${item.slug}`}
-                          className={`rounded-full border px-3 py-2 text-sm transition-colors ${item.slug === article.categories?.slug ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-200 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'}`}
-                        >
-                          {item.name}
-                        </Link>
-                      ))}
-                    </div>
                   </div>
                 </Card>
 
                 {relatedArticles && relatedArticles.length > 0 && (
-                  <Card className="rounded-[24px] dark:bg-gray-800 dark:border-gray-700 shadow-sm">
-                    <div className="p-6">
-                      <h2 className="text-xl font-bold mb-4 dark:text-white">You May Also Like</h2>
-                      <div className="grid grid-cols-1 gap-4">
-                        {relatedArticles.map((related) => (
-                          <ArticleMiniCard key={related.id} article={related} compact />
-                        ))}
+                  <section>
+                    <div className="mb-5 flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
+                          Keep Reading
+                        </p>
+                        <h2 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">
+                          Related Articles
+                        </h2>
                       </div>
                     </div>
-                  </Card>
+                    <div className="grid gap-5 md:grid-cols-2">
+                      {relatedArticles.map((related) => (
+                        <ArticleMiniCard key={related.id} article={related} compact />
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+              </div>
+
+              <aside className="space-y-6 xl:sticky xl:top-28">
+                {latestArticles && latestArticles.length > 0 && (
+                  <aside className="h-full border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-[#d62828] dark:text-red-400" />
+                      <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-600 dark:text-slate-300">
+                        Latest News
+                      </p>
+                    </div>
+                    <div className="mt-3 grid gap-2">
+                      {latestArticles.slice(0, 4).map((item) => (
+                        <Link
+                          key={item.id}
+                          href={`/${item.categories?.slug || 'news'}/${item.slug}`}
+                          className="group grid min-w-0 grid-cols-[minmax(0,1fr)_72px] items-center gap-2 p-2 sm:grid-cols-[minmax(0,1fr)_80px] sm:p-2.5 lg:grid-cols-[minmax(0,1fr)_88px]"
+                        >
+                          <div className="min-w-0">
+                            <p className="break-words text-[0.92rem] font-medium leading-snug text-slate-900 decoration-current underline-offset-4 group-hover:underline dark:text-white sm:text-[0.98rem]">
+                              {item.title}
+                            </p>
+                            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600 dark:text-slate-400 sm:text-sm">
+                              {item.published_at && (
+                                <span>{formatDistanceToNow(new Date(item.published_at), { addSuffix: true })}</span>
+                              )}
+                              {item.authors?.name && (
+                                <span>by {item.authors.name}</span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="relative h-[72px] w-[72px] overflow-hidden bg-slate-100 dark:bg-slate-800 sm:h-[80px] sm:w-[80px] lg:h-[88px] lg:w-[88px]">
+                            {item.featured_image_url ? (
+                              <Image
+                                src={item.featured_image_url}
+                                alt={item.title}
+                                fill
+                                className="object-cover"
+                                sizes="(max-width: 639px) 72px, (max-width: 1023px) 80px, 88px"
+                              />
+                            ) : (
+                              <div className="flex h-full items-center justify-center text-xs font-medium text-slate-400 dark:text-slate-500">
+                                img
+                              </div>
+                            )}
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  </aside>
                 )}
 
                 {trendingArticles && trendingArticles.length > 0 && (
-                  <Card className="rounded-[24px] dark:bg-gray-800 dark:border-gray-700 shadow-sm">
-                    <div className="p-6">
-                      <div className="flex items-center gap-2 mb-4">
-                        <TrendingUp className="h-4 w-4 text-orange-500" />
-                        <h2 className="text-xl font-bold dark:text-white">Trending Now</h2>
-                      </div>
-                      <div className="grid grid-cols-1 gap-4">
-                        {trendingArticles.map((trending) => (
-                          <ArticleMiniCard key={trending.id} article={trending} compact />
-                        ))}
-                      </div>
+                  <aside className="h-full border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-[#d62828]" />
+                      <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
+                        Popular Now
+                      </p>
                     </div>
-                  </Card>
+                    <div className="mt-3 space-y-2">
+                      {trendingArticles.map((item, index) => (
+                        <Link
+                          key={item.id}
+                          href={`/${item.categories?.slug || 'news'}/${item.slug}`}
+                          className="group flex gap-2 p-1.5 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800"
+                        >
+                          <span className="mt-1 text-lg font-black text-slate-300 dark:text-slate-600">
+                            {String(index + 1).padStart(2, '0')}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+                              {item.categories?.name || 'News'}
+                            </p>
+                            <h3 className="mt-1 line-clamp-3 text-sm font-semibold leading-6 text-slate-900 dark:text-white">
+                              <span className="group-hover:underline group-hover:underline-offset-4">
+                                {item.title}
+                              </span>
+                            </h3>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  </aside>
                 )}
               </aside>
             </div>
-
-            {latestArticles && latestArticles.length > 0 && (
-              <div className="mt-12">
-                <h2 className="text-2xl font-bold mb-6 dark:text-white">Latest News</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {latestArticles.slice(0, 6).map((item) => (
-                    <ArticleMiniCard key={item.id} article={item} compact />
-                  ))}
-                </div>
-              </div>
-            )}
           </article>
         </div>
       </>
@@ -575,4 +634,13 @@ export default async function ArticlePage({ params }) {
     notFound()
   }
 }
+
+
+
+
+
+
+
+
+
 

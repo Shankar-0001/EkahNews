@@ -5,10 +5,26 @@ function buildCsp() {
   const connectSrc = [
     "'self'",
     supabaseOrigin,
+    'https://cdn.ampproject.org',
     'https://www.google-analytics.com',
     'https://region1.google-analytics.com',
     'https://pagead2.googlesyndication.com',
     'https://googleads.g.doubleclick.net',
+    isDev ? 'http://localhost:3000' : '',
+    isDev ? 'http://127.0.0.1:3000' : '',
+    isDev ? 'ws://localhost:3000' : '',
+    isDev ? 'ws://127.0.0.1:3000' : '',
+  ].filter(Boolean).join(' ')
+  const scriptSrc = [
+    "'self'",
+    "'unsafe-inline'",
+    isDev ? "'unsafe-eval'" : '',
+    'https://cdn.ampproject.org',
+    'https://www.googletagmanager.com',
+    'https://pagead2.googlesyndication.com',
+    'https://www.google-analytics.com',
+    'https://partner.googleadservices.com',
+    'https://www.googlesyndication.com',
   ].filter(Boolean).join(' ')
 
   return [
@@ -17,7 +33,8 @@ function buildCsp() {
     "form-action 'self'",
     "frame-ancestors 'self'",
     "object-src 'none'",
-    `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''} https://www.googletagmanager.com https://pagead2.googlesyndication.com https://www.google-analytics.com https://partner.googleadservices.com https://www.googlesyndication.com`,
+    `script-src ${scriptSrc}`,
+    `script-src-elem ${scriptSrc}`,
     "style-src 'self' 'unsafe-inline' https:",
     "img-src 'self' data: blob: https:",
     "font-src 'self' data: https:",

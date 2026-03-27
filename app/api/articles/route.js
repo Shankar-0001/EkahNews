@@ -5,6 +5,7 @@ import { validateArticle, ValidationError } from '@/lib/validation'
 import { requireRequestAuth, getUserAuthorId } from '@/lib/auth-utils'
 import { sanitizeRichText } from '@/lib/security-utils'
 import { normalizeManualKeywords } from '@/lib/keywords'
+import { validateArticlePublishReadiness } from '@/lib/article-publish-validation'
 
 function normalizeStructuredData(value) {
   if (!value) return null
@@ -66,8 +67,13 @@ export async function POST(request) {
       return apiResponse(400, null, 'User must have an author profile')
     }
 
+    await validateArticlePublishReadiness(admin, articleData)
+
     const sanitizedContent = sanitizeRichText(articleData.content)
     const structuredData = normalizeStructuredData(articleData.structured_data)
+    const publishedAt = articleData.status === 'published'
+      ? (articleData.published_at || new Date().toISOString())
+      : (articleData.published_at || null)
 
     const { data: article, error } = await admin
       .from('articles')
@@ -79,7 +85,7 @@ export async function POST(request) {
         canonical_url: articleData.canonical_url || null,
         schema_type: articleData.schema_type || 'NewsArticle',
         structured_data: structuredData,
-        published_at: articleData.published_at || null,
+        published_at: publishedAt,
         updated_at: articleData.updated_at || new Date().toISOString(),
       }])
       .select('id, title, slug, excerpt, content, content_json, featured_image_url, featured_image_alt, keywords, status, category_id, author_id, seo_title, seo_description, canonical_url, schema_type, structured_data, published_at, created_at, updated_at, categories(slug), authors(slug)')
@@ -95,7 +101,7 @@ export async function POST(request) {
     return apiResponse(201, { article })
   } catch (error) {
     if (error.name === 'ValidationError') {
-      return apiResponse(422, null, error.fields?.structured_data || error.message)
+      return apiResponse(422, null, error.fields || error.message)
     }
     if (error.name === 'AuthError') {
       return apiResponse(401, null, error.message)
@@ -105,4 +111,3 @@ export async function POST(request) {
     return apiResponse(500, null, error.message || 'Internal server error')
   }
 }
-

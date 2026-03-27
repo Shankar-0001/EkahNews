@@ -1,33 +1,32 @@
-import Link from 'next/link'
 import Image from 'next/image'
-import { Card } from '@/components/ui/card'
-import { formatDistanceToNow } from 'date-fns'
+import { formatDistanceToNowStrict } from 'date-fns'
 
 export default function WebStoryCard({ story }) {
   return (
-    <Link href={`/web-stories/${story.slug}`} className="block">
-      <Card className="overflow-hidden rounded-[20px] hover:shadow-lg transition-shadow dark:bg-gray-800 dark:border-gray-700">
-        <div className="relative aspect-[9/16] w-full bg-gray-100 dark:bg-gray-900">
+    <a href={`/web-stories/${story.slug}`} className="block h-full">
+      <div className="h-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-colors hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900">
+        <div className="relative aspect-[3/4] w-full overflow-hidden bg-slate-100 dark:bg-slate-950">
           {story.cover_image && (
             <Image
               src={story.cover_image}
               alt={story.cover_image_alt || story.title || 'Web story cover'}
               fill
               className="object-cover transition-transform duration-500 hover:scale-[1.03]"
-              sizes="(max-width: 768px) 50vw, 20vw"
+              sizes="(max-width: 768px) 60vw, 255px"
             />
           )}
         </div>
-        <div className="p-3 md:p-4">
-          <h3 className="text-sm md:text-base font-semibold leading-snug line-clamp-3 dark:text-white">{story.title}</h3>
-          {story.authors?.name && (
-            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 line-clamp-1">By {story.authors.name}</p>
-          )}
+        <div className="border-t border-slate-200 p-3 dark:border-slate-800">
+          <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-slate-900 md:text-[15px] dark:text-white">
+            {story.title}
+          </h3>
           {story.published_at && (
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{formatDistanceToNow(new Date(story.published_at), { addSuffix: true })}</p>
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+              {formatDistanceToNowStrict(new Date(story.published_at), { addSuffix: true })}
+            </p>
           )}
         </div>
-      </Card>
-    </Link>
+      </div>
+    </a>
   )
 }

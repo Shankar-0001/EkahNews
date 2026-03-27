@@ -1,6 +1,6 @@
-import './globals.css'
+﻿import './globals.css'
 import SiteFooter from '@/components/layout/SiteFooter'
-import { getPublicationLogoUrl, SITE_URL } from '@/lib/site-config'
+import { SITE_URL } from '@/lib/site-config'
 import RootProviders from '@/components/layout/RootProviders'
 import OptionalGlobalScripts from '@/components/layout/OptionalGlobalScripts'
 
@@ -9,9 +9,9 @@ export const metadata = {
   description: 'Your trusted source for breaking news, trending stories, and expert insights.',
   metadataBase: new URL(SITE_URL),
   icons: {
-    icon: getPublicationLogoUrl(),
-    shortcut: getPublicationLogoUrl(),
-    apple: getPublicationLogoUrl(),
+    icon: '/favicon.png',
+    shortcut: '/favicon.png',
+    apple: '/favicon.png',
   },
   robots: {
     index: true,

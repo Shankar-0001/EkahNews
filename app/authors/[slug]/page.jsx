@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { notFound, redirect } from 'next/navigation'
+import { notFound, permanentRedirect } from 'next/navigation'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -46,6 +46,27 @@ async function findAuthorBySlug(rawSlug) {
   return author || null
 }
 
+async function countPublishedArticles(authorId) {
+  const supabase = await createClient()
+  const { count } = await supabase
+    .from('articles')
+    .select('id', { count: 'exact', head: true })
+    .eq('author_id', authorId)
+    .eq('status', 'published')
+
+  if ((count || 0) > 0) {
+    return count || 0
+  }
+
+  const { count: fallbackCount } = await supabase
+    .from('articles')
+    .select('id, authors!inner(id)', { count: 'exact', head: true })
+    .eq('status', 'published')
+    .eq('authors.id', authorId)
+
+  return fallbackCount || 0
+}
+
 export async function generateMetadata({ params }) {
   const author = await findAuthorBySlug(params.slug)
 
@@ -56,11 +77,16 @@ export async function generateMetadata({ params }) {
   const authorSlug = author.slug && !author.slug.startsWith('@') ? author.slug : author.id
   const canonical = absoluteUrl(`/authors/${authorSlug}`)
   const description = author.bio || `Read articles by ${author.name} on EkahNews.`
+  const publishedCount = await countPublishedArticles(author.id)
 
   return {
     title: `${author.name} | EkahNews`,
     description,
     alternates: { canonical },
+    robots: {
+      index: publishedCount > 0,
+      follow: true,
+    },
     openGraph: {
       type: 'profile',
       title: `${author.name} | EkahNews`,
@@ -87,7 +113,7 @@ export default async function AuthorProfilePage({ params }) {
 
   const canonicalSlug = author.slug && !author.slug.startsWith('@') ? author.slug : author.id
   if (canonicalSlug && canonicalSlug !== params.slug) {
-    redirect(`/authors/${canonicalSlug}`)
+    permanentRedirect(`/authors/${canonicalSlug}`)
   }
 
   const [primaryArticlesResult, categoriesResult] = await Promise.all([

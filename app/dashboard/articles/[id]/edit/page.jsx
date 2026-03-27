@@ -22,6 +22,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import KeywordInput from '@/components/dashboard/KeywordInput'
+import TagInput from '@/components/dashboard/TagInput'
 import {
     AlertDialog,
     AlertDialogAction,
@@ -35,6 +36,48 @@ import {
 import { X, Eye, Save, Trash2, AlertTriangle } from 'lucide-react'
 import { createSlug } from '@/lib/slug'
 import Link from 'next/link'
+
+function findLatestNewsCategory(categories = []) {
+    return (
+        categories.find((category) => category.slug === 'latest-news')
+        || categories.find((category) => category.name?.trim().toLowerCase() === 'latest news')
+        || null
+    )
+}
+
+function getApiErrorMessage(errorPayload, fallbackMessage) {
+    if (!errorPayload) return fallbackMessage
+    if (typeof errorPayload === 'string') return errorPayload
+    if (typeof errorPayload === 'object') {
+        const firstFieldError = Object.values(errorPayload).find((value) => typeof value === 'string' && value.trim())
+        if (firstFieldError) return firstFieldError
+    }
+    return fallbackMessage
+}
+
+function validateSubmissionReadiness({
+    title,
+    excerpt,
+    content,
+    categoryId,
+    featuredImage,
+    featuredImageAlt,
+    seoTitle,
+    seoDescription,
+    nextStatus,
+}) {
+    if (!title.trim()) return 'Article title is required'
+    if (!content.html || content.html.trim().length === 0) return 'Article content cannot be empty'
+    if (nextStatus !== 'draft' && nextStatus !== 'archived') {
+        if (!categoryId) return 'Category is required before submission'
+        if (!excerpt.trim()) return 'Excerpt is required before submission'
+        if (!featuredImage) return 'Featured image is required before submission'
+        if (!featuredImageAlt.trim()) return 'Featured image alt text is required before submission'
+        if (!seoTitle.trim()) return 'SEO title is required before submission'
+        if (!seoDescription.trim()) return 'SEO description is required before submission'
+    }
+    return ''
+}
 
 export default function EditArticlePage() {
     const router = useRouter()
@@ -75,7 +118,6 @@ export default function EditArticlePage() {
     const [categories, setCategories] = useState([])
     const [tags, setTags] = useState([])
     const [authors, setAuthors] = useState([])
-    const [newTagName, setNewTagName] = useState('')
 
     useEffect(() => {
         loadUserAndArticle()
@@ -175,8 +217,14 @@ export default function EditArticlePage() {
                 setAuthors(authorData ? [{ id: authorData.id, name: user.email?.split('@')[0] || 'Me' }] : [])
             }
 
-            setCategories(categoriesData || [])
+            const resolvedCategories = categoriesData || []
+            const latestNewsCategory = findLatestNewsCategory(resolvedCategories)
+
+            setCategories(resolvedCategories)
             setTags(tagsData || [])
+            if (!articleData.category_id && latestNewsCategory?.id) {
+                setCategoryId(latestNewsCategory.id)
+            }
 
             setLoading(false)
         } catch (err) {
@@ -297,20 +345,24 @@ export default function EditArticlePage() {
     }
 
     const saveArticle = async (newStatus) => {
-        if (!title.trim()) {
-            toast({
-                variant: 'destructive',
-                title: 'Validation error',
-                description: 'Article title is required',
-            })
-            return
-        }
+        const finalStatus = userRole === 'author' ? (article?.status || newStatus) : newStatus
+        const readinessError = validateSubmissionReadiness({
+            title,
+            excerpt,
+            content,
+            categoryId,
+            featuredImage,
+            featuredImageAlt,
+            seoTitle,
+            seoDescription,
+            nextStatus: finalStatus,
+        })
 
-        if (!content.html || content.html.trim().length === 0) {
+        if (readinessError) {
             toast({
                 variant: 'destructive',
                 title: 'Validation error',
-                description: 'Article content cannot be empty',
+                description: readinessError,
             })
             return
         }
@@ -320,7 +372,6 @@ export default function EditArticlePage() {
 
         try {
             // Authors should not bypass editorial workflow during edits
-            const finalStatus = userRole === 'author' ? (article?.status || newStatus) : newStatus
             const existingPublishedAt = article?.published_at || null
             const normalizedPublishedAt = finalStatus === 'published'
                 ? (toIsoDateTime(publishDate) || existingPublishedAt || new Date().toISOString())
@@ -358,7 +409,7 @@ export default function EditArticlePage() {
             const result = await response.json()
 
             if (!response.ok) {
-                throw new Error(result.error || 'Failed to update article')
+                throw new Error(getApiErrorMessage(result.error, 'Failed to update article'))
             }
 
             const deleteTagsResponse = await fetch(`/api/articles/${params.id}/tags`, { method: 'DELETE' })
@@ -389,7 +440,6 @@ export default function EditArticlePage() {
 
             router.push('/dashboard/articles')
         } catch (err) {
-            console.error('Error saving article:', err)
             setError(err.message || 'Failed to save article')
             toast({
                 variant: 'destructive',
@@ -432,16 +482,8 @@ export default function EditArticlePage() {
         }
     }
 
-    const toggleTag = (tagId) => {
-        setSelectedTags(prev =>
-            prev.includes(tagId)
-                ? prev.filter(id => id !== tagId)
-                : [...prev, tagId]
-        )
-    }
-
-    const createTag = async () => {
-        const name = newTagName.trim()
+    const createTag = async (rawName) => {
+        const name = rawName.trim()
         if (!name) return
         const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
@@ -455,9 +497,7 @@ export default function EditArticlePage() {
         if (response.ok && result?.data?.tag) {
             const createdTag = result.data.tag
             setTags((prev) => [...prev, createdTag])
-            setSelectedTags((prev) => [...prev, createdTag.id])
-            setNewTagName('')
-            return
+            return createdTag
         }
 
         toast({
@@ -465,6 +505,7 @@ export default function EditArticlePage() {
             title: 'Tag creation failed',
             description: result?.error || 'Could not create tag',
         })
+        return null
     }
 
     const selectedCategory = categories.find((cat) => cat.id === categoryId)
@@ -658,37 +699,13 @@ export default function EditArticlePage() {
                         <CardTitle className="text-lg">Tags</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        {userRole === 'admin' && (
-                            <div className="flex gap-2 mb-4">
-                                <Input
-                                    value={newTagName}
-                                    onChange={(e) => setNewTagName(e.target.value)}
-                                    placeholder="Create new tag"
-                                />
-                                <Button type="button" variant="outline" onClick={createTag}>
-                                    Add
-                                </Button>
-                            </div>
-                        )}
-                        {userRole !== 'admin' && (
-                            <p className="mb-4 text-sm text-gray-500">Authors can apply existing tags but cannot create new taxonomy.</p>
-                        )}
-                        <div className="flex flex-wrap gap-2">
-                            {tags.length > 0 ? (
-                                tags.map(tag => (
-                                    <Badge
-                                        key={tag.id}
-                                        variant={selectedTags.includes(tag.id) ? 'default' : 'outline'}
-                                        className="cursor-pointer"
-                                        onClick={() => toggleTag(tag.id)}
-                                    >
-                                        {tag.name}
-                                    </Badge>
-                                ))
-                            ) : (
-                                <p className="text-sm text-gray-500">No tags available</p>
-                            )}
-                        </div>
+                        <TagInput
+                            tags={tags}
+                            value={selectedTags}
+                            onChange={setSelectedTags}
+                            onCreateTag={createTag}
+                            description="Type a tag and press Enter to add it. Both admins and authors can create missing tags here."
+                        />
                     </CardContent>
                 </Card>
 

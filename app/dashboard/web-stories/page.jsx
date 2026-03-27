@@ -71,8 +71,13 @@ export default function DashboardWebStoriesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Web Stories</h1>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Web Stories</h1>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Published stories appear on the public site. Draft and pending stories stay in the dashboard until approved.
+          </p>
+        </div>
         <Link href="/dashboard/web-stories/new">
           <Button>Create Story</Button>
         </Link>
@@ -83,9 +88,9 @@ export default function DashboardWebStoriesPage() {
       ) : stories.length === 0 ? (
         <Card><CardContent className="p-6">No stories yet.</CardContent></Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {stories.map((story) => (
-            <Card key={story.id} className="dark:bg-gray-800 dark:border-gray-700">
+            <Card key={story.id} className="dark:border-gray-700 dark:bg-gray-800">
               <CardHeader>
                 <div className="flex items-start justify-between gap-3">
                   <CardTitle className="text-lg dark:text-white">{story.title}</CardTitle>
@@ -96,11 +101,16 @@ export default function DashboardWebStoriesPage() {
                 <p className="text-gray-600 dark:text-gray-300">/web-stories/{story.slug}</p>
                 <p className="text-gray-500 dark:text-gray-400">Author: {story.authors?.name || '-'}</p>
                 <p className="text-gray-500 dark:text-gray-400">Category: {story.categories?.name || '-'}</p>
+                <p className="text-gray-500 dark:text-gray-400">
+                  Visibility: {story.status === 'published' ? 'Live on the public web stories pages' : 'Saved in dashboard only until published'}
+                </p>
                 {story.published_at && (
                   <p className="text-gray-500 dark:text-gray-400">Published: {new Date(story.published_at).toLocaleString()}</p>
                 )}
                 <div className="flex gap-2">
-                  <Link href={`/web-stories/${story.slug}`} target="_blank"><Button size="sm" variant="ghost"><Eye className="mr-1 h-4 w-4" />View</Button></Link>
+                  {story.status === 'published' ? (
+                    <Link href={`/web-stories/${story.slug}`} target="_blank"><Button size="sm" variant="ghost"><Eye className="mr-1 h-4 w-4" />View</Button></Link>
+                  ) : null}
                   <Link href={`/dashboard/web-stories/${story.id}/edit`}><Button size="sm" variant="outline">Edit</Button></Link>
                   <Button size="sm" variant="destructive" onClick={() => setStoryToDelete(story)}>Delete</Button>
                 </div>

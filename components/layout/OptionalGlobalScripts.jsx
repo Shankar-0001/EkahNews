@@ -2,38 +2,16 @@
 
 import Script from 'next/script'
 import { usePathname } from 'next/navigation'
-import { useEffect, useState } from 'react'
 
 const PLACEHOLDER_CLIENT_IDS = new Set(['ca-pub-0000000000000000', 'ca-pub-1234567890123456'])
+const DEFAULT_GA_MEASUREMENT_ID = 'G-8HXXQFFZCH'
 
 function isAmpStoryPath(pathname = '') {
   return pathname.startsWith('/web-stories/') && pathname !== '/web-stories'
 }
 
-function getProductionHostname() {
-  const siteUrl = process.env.NEXT_PUBLIC_BASE_URL
-  if (!siteUrl) return ''
-
-  try {
-    return new URL(siteUrl).hostname
-  } catch {
-    return ''
-  }
-}
-
 export default function OptionalGlobalScripts() {
   const pathname = usePathname() || ''
-  const [isProductionHost, setIsProductionHost] = useState(false)
-
-  useEffect(() => {
-    const productionHostname = getProductionHostname()
-    if (!productionHostname || typeof window === 'undefined') {
-      setIsProductionHost(true)
-      return
-    }
-
-    setIsProductionHost(window.location.hostname === productionHostname)
-  }, [])
 
   if (isAmpStoryPath(pathname)) {
     return null
@@ -45,8 +23,8 @@ export default function OptionalGlobalScripts() {
   const adsenseScriptSrc = hasValidAdsenseClientId
     ? `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsenseClientId}`
     : null
-  const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID
-  const shouldLoadAnalytics = Boolean(gaMeasurementId && isProductionHost)
+  const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || DEFAULT_GA_MEASUREMENT_ID
+  const shouldLoadAnalytics = Boolean(gaMeasurementId)
 
   return (
     <>
@@ -56,10 +34,14 @@ export default function OptionalGlobalScripts() {
             src={`https://www.googletagmanager.com/gtag/js?id=${gaMeasurementId}`}
             strategy="afterInteractive"
           />
-          <Script
-            src={`/analytics.js?id=${gaMeasurementId}`}
-            strategy="afterInteractive"
-          />
+          <Script id="google-gtag-init" strategy="afterInteractive">
+            {`
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+              gtag('config', '${gaMeasurementId}');
+            `}
+          </Script>
         </>
       )}
       {adsEnabled && adsenseScriptSrc && (

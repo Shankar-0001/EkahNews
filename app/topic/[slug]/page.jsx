@@ -1,4 +1,4 @@
-import { createClient as createPublicClient } from '@supabase/supabase-js'
+import { createPublicClient } from '@/lib/supabase/public-server'
 import PublicHeader from '@/components/layout/PublicHeader'
 import ArticleMiniCard from '@/components/content/ArticleMiniCard'
 import StructuredData from '@/components/seo/StructuredData'

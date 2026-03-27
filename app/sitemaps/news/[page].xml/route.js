@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { absoluteUrl } from '@/lib/site-config'
+import { getArticleCanonicalUrl } from '@/lib/site-config'
 import { xmlResponse } from '@/lib/sitemap-utils'
 
 const PAGE_SIZE = 1000
@@ -52,7 +52,7 @@ export async function GET(_request, context) {
 
   const { data: rows } = await supabase
     .from('articles')
-    .select('slug, title, published_at, categories(slug)')
+    .select('slug, title, canonical_url, published_at, categories(slug)')
     .eq('status', 'published')
     .gte('published_at', cutoffIso)
     .order('published_at', { ascending: false })
@@ -67,4 +67,5 @@ export async function GET(_request, context) {
 
   return xmlResponse(buildNewsSitemapXml(entries))
 }
+
 

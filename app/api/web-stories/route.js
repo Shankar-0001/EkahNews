@@ -6,12 +6,21 @@ import { resolveCanonicalUrl, slugFromText } from '@/lib/site-config'
 import { validateWebStoryPayload } from '@/lib/web-story-validation'
 import { normalizeManualKeywords } from '@/lib/keywords'
 
+
+function normalizeSelectedId(value) {
+  if (!value || value === 'none' || value === 'undefined' || value === 'null') return null
+  return value
+}
+
 function normalizeSlides(slides, storyTitle = '') {
   if (!Array.isArray(slides)) return []
   return slides
     .map((slide) => ({
+      media_type: slide?.media_type === 'video' ? 'video' : 'image',
       image: slide?.image || '',
       image_alt: slide?.image_alt || '',
+      video: slide?.video || '',
+      video_duration: Number(slide?.video_duration) || null,
       headline: slide?.headline || storyTitle || '',
       description: slide?.description || '',
       relatedArticleUrl: slide?.relatedArticleUrl || '',
@@ -20,7 +29,7 @@ function normalizeSlides(slides, storyTitle = '') {
       whatsapp_group_url: slide?.whatsapp_group_url || '',
       seo_description: slide?.seo_description || '',
     }))
-    .filter((slide) => slide.image && (slide.headline || storyTitle))
+    .filter((slide) => (slide.image || slide.video) && (slide.headline || storyTitle))
 }
 
 function deriveStoryCtas(slides = []) {
@@ -100,7 +109,8 @@ export async function POST(request) {
     const supabase = await createClient()
     const payload = await request.json()
     const keywords = normalizeManualKeywords(payload.keywords || [])
-    let authorId = payload.author_id || null
+    let authorId = normalizeSelectedId(payload.author_id)
+    const categoryId = normalizeSelectedId(payload.category_id)
     const ownAuthorId = await getUserAuthorId(user.userId)
 
     if (user.role === 'admin') {
@@ -149,7 +159,7 @@ export async function POST(request) {
       : null
     const normalizedUpdatedAt = toIsoDateTime(payload.updated_at) || new Date().toISOString()
     const derivedSeoDescription = payload.seo_description || slides.find((s) => s.seo_description)?.seo_description || null
-    const coverImage = payload.cover_image || slides[0].image
+    const coverImage = payload.cover_image || slides[0].image || ''
     const validation = validateWebStoryPayload({
       title,
       coverImage,
@@ -164,7 +174,15 @@ export async function POST(request) {
       status: finalStatus,
     })
     if (!validation.valid) {
-      return apiResponse(422, null, validation.issues[0])
+      console.warn('Web story create validation failed', {
+        title,
+        status: finalStatus,
+        issues: validation.issues,
+      })
+      return apiResponse(422, null, {
+        message: validation.issues[0],
+        issues: validation.issues,
+      })
     }
 
     const canonicalUrl = resolveCanonicalUrl(payload.canonical_url, buildStoryPath(slug))
@@ -175,7 +193,7 @@ export async function POST(request) {
       cover_image_alt: payload.cover_image_alt?.trim() || title,
       slides,
       author_id: authorId,
-      category_id: payload.category_id || null,
+      category_id: categoryId,
       tags: Array.isArray(payload.tags) ? payload.tags : [],
       keywords,
       related_article_slug: payload.related_article_slug || null,
@@ -206,4 +224,13 @@ export async function POST(request) {
     return apiResponse(500, null, error.message || 'Failed to create story')
   }
 }
+
+
+
+
+
+
+
+
+
 
