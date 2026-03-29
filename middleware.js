@@ -1,8 +1,31 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 
+function getPreferredOrigin() {
+  const configuredBaseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://www.ekahnews.com'
+
+  try {
+    const url = new URL(configuredBaseUrl)
+
+    if (url.hostname === 'ekahnews.com') {
+      url.hostname = 'www.ekahnews.com'
+    }
+
+    url.protocol = 'https:'
+    return url.origin
+  } catch {
+    return 'https://www.ekahnews.com'
+  }
+}
+
 export async function middleware(request) {
   const pathname = request.nextUrl.pathname
+  const preferredOrigin = getPreferredOrigin()
+  const currentUrl = request.nextUrl.clone()
+
+  if (currentUrl.origin !== preferredOrigin) {
+    return NextResponse.redirect(`${preferredOrigin}${currentUrl.pathname}${currentUrl.search}`, 308)
+  }
 
   // Only touch Supabase auth for routes that need auth decisions.
   const isProtectedRoute = pathname.startsWith('/dashboard')
