@@ -21,18 +21,22 @@ function normalizeStructuredData(value) {
 }
 
 function revalidateArticleSurface(article) {
-  const categorySlug = article?.categories?.slug || 'news'
-  if (article?.slug) {
-    revalidatePath(`/${categorySlug}/${article.slug}`)
-  }
-  revalidatePath('/')
-  revalidatePath(`/category/${categorySlug}`)
-  revalidatePath('/sitemap.xml')
-  revalidatePath('/article-sitemap.xml')
-  revalidatePath('/news-sitemap.xml')
-  revalidatePath('/category-sitemap.xml')
-  if (article?.authors?.slug) {
-    revalidatePath(`/authors/${article.authors.slug}`)
+  try {
+    const categorySlug = article?.categories?.slug || 'news'
+    if (article?.slug) {
+      revalidatePath(`/${categorySlug}/${article.slug}`)
+    }
+    revalidatePath('/')
+    revalidatePath(`/category/${categorySlug}`)
+    revalidatePath('/sitemap.xml')
+    revalidatePath('/article-sitemap.xml')
+    revalidatePath('/news-sitemap.xml')
+    revalidatePath('/category-sitemap.xml')
+    if (article?.authors?.slug) {
+      revalidatePath(`/authors/${article.authors.slug}`)
+    }
+  } catch (error) {
+    logger.warn('[POST-article] Revalidate failed', { error: error?.message || String(error) })
   }
 }
 

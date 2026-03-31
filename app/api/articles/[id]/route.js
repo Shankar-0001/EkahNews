@@ -21,18 +21,22 @@ function normalizeStructuredData(value) {
 }
 
 function revalidateArticleSurface(article) {
-  const categorySlug = article?.categories?.slug || 'news'
-  if (article?.slug) {
-    revalidatePath(`/${categorySlug}/${article.slug}`)
-  }
-  revalidatePath('/')
-  revalidatePath(`/category/${categorySlug}`)
-  revalidatePath('/sitemap.xml')
-  revalidatePath('/article-sitemap.xml')
-  revalidatePath('/news-sitemap.xml')
-  revalidatePath('/category-sitemap.xml')
-  if (article?.authors?.slug) {
-    revalidatePath(`/authors/${article.authors.slug}`)
+  try {
+    const categorySlug = article?.categories?.slug || 'news'
+    if (article?.slug) {
+      revalidatePath(`/${categorySlug}/${article.slug}`)
+    }
+    revalidatePath('/')
+    revalidatePath(`/category/${categorySlug}`)
+    revalidatePath('/sitemap.xml')
+    revalidatePath('/article-sitemap.xml')
+    revalidatePath('/news-sitemap.xml')
+    revalidatePath('/category-sitemap.xml')
+    if (article?.authors?.slug) {
+      revalidatePath(`/authors/${article.authors.slug}`)
+    }
+  } catch (error) {
+    logger.warn('[PATCH-article] Revalidate failed', { error: error?.message || String(error) })
   }
 }
 
@@ -43,7 +47,12 @@ export async function PATCH(request, { params }) {
     const user = await requireRequestAuth(request)
     logger.info(`[${requestId}] User authenticated`, { userId: user.userId })
 
-    const data = await request.json()
+    let data
+    try {
+      data = await request.json()
+    } catch {
+      return apiResponse(400, null, 'Invalid JSON payload')
+    }
     data.keywords = normalizeManualKeywords(data.keywords || [])
     data.schema_type = data.schema_type || 'NewsArticle'
     validateArticle(data)
