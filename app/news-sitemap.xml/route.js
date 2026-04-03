@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createPublicClient } from '@/lib/supabase/public-server'
+import { createOptionalPublicClient } from '@/lib/supabase/public-server'
 import { getArticleCanonicalUrl } from '@/lib/site-config'
 
 export const dynamic = 'force-dynamic'
@@ -17,7 +17,19 @@ function escapeXml(value) {
 }
 
 export async function GET() {
-  const supabase = createPublicClient()
+  const supabase = createOptionalPublicClient()
+  if (!supabase) {
+    return new NextResponse(
+      '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9"></urlset>',
+      {
+        headers: {
+          'Content-Type': 'application/xml; charset=utf-8',
+          'Cache-Control': 'no-store, max-age=0',
+        },
+      }
+    )
+  }
+
   const cutoffIso = new Date(Date.now() - NEWS_WINDOW_MS).toISOString()
 
   const { data: articles, error } = await supabase
@@ -75,5 +87,4 @@ export async function GET() {
     },
   })
 }
-
 

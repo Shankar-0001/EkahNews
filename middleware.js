@@ -18,12 +18,33 @@ function getPreferredOrigin() {
   }
 }
 
+function shouldRedirectToPreferredOrigin(currentUrl, preferredOrigin) {
+  try {
+    const preferredUrl = new URL(preferredOrigin)
+    const currentHostname = currentUrl.hostname
+    const preferredHostname = preferredUrl.hostname
+
+    const shouldUpgradeProtocol =
+      currentHostname === preferredHostname
+      && currentUrl.protocol !== preferredUrl.protocol
+
+    const shouldUpgradeHostname =
+      currentHostname === 'ekahnews.com'
+      && preferredHostname === 'www.ekahnews.com'
+      && currentUrl.protocol === preferredUrl.protocol
+
+    return shouldUpgradeProtocol || shouldUpgradeHostname
+  } catch {
+    return false
+  }
+}
+
 export async function middleware(request) {
   const pathname = request.nextUrl.pathname
   const preferredOrigin = getPreferredOrigin()
   const currentUrl = request.nextUrl.clone()
 
-  if (currentUrl.origin !== preferredOrigin) {
+  if (shouldRedirectToPreferredOrigin(currentUrl, preferredOrigin)) {
     return NextResponse.redirect(`${preferredOrigin}${currentUrl.pathname}${currentUrl.search}`, 308)
   }
 

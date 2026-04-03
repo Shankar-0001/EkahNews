@@ -1,4 +1,4 @@
-import { createPublicClient } from '@/lib/supabase/public-server'
+import { createOptionalPublicClient } from '@/lib/supabase/public-server'
 import Link from 'next/link'
 import Image from 'next/image'
 import { ArrowRight, Clock3, TrendingUp, User } from 'lucide-react'
@@ -118,7 +118,8 @@ function getAdaptiveHeadlineClass(title = '', {
 }
 
 export default async function HomePage() {
-  const supabase = createPublicClient()
+  const supabase = createOptionalPublicClient()
+  const isMissingPublicConfig = !supabase
   let articles = []
   let categories = []
   let engagement = []
@@ -126,7 +127,8 @@ export default async function HomePage() {
   let categoryShowcases = []
   let forYouCards = []
 
-  try {
+  if (supabase) {
+    try {
     const [articlesRes, categoriesRes, engagementRes, storiesRes, categoryStatsRes] = await Promise.all([
       supabase
         .from('articles')
@@ -286,8 +288,9 @@ export default async function HomePage() {
           : [],
       })).filter((item) => item.articles.length > 0)
     }
-  } catch (error) {
-    console.error('Homepage data fetch failed:', error)
+    } catch (error) {
+      console.error('Homepage data fetch failed:', error)
+    }
   }
 
   const featuredArticle = articles[0]
@@ -312,6 +315,12 @@ export default async function HomePage() {
         <PublicHeader categories={categories || []} />
 
         <main className="w-full max-w-6xl mx-auto px-4 py-8 md:py-10">
+          {isMissingPublicConfig && process.env.NODE_ENV !== 'production' && (
+            <section className="mb-8 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              Homepage data is empty because `NEXT_PUBLIC_SUPABASE_URL` and/or `NEXT_PUBLIC_SUPABASE_ANON_KEY` is missing.
+              Add them to `.env.local` and restart the server.
+            </section>
+          )}
           {featuredArticle && (
             <section className="mb-10">
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1.65fr)_minmax(280px,0.95fr)] lg:items-start">
@@ -647,6 +656,4 @@ export default async function HomePage() {
     </>
   )
 }
-
-
 

@@ -1,4 +1,4 @@
-import { createPublicClient } from '@/lib/supabase/public-server'
+import { createOptionalPublicClient } from '@/lib/supabase/public-server'
 import { notFound, permanentRedirect } from 'next/navigation'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -26,11 +26,10 @@ import { parseStructuredDataOverride } from '@/lib/seo-utils'
 export const revalidate = 1800
 
 export async function generateStaticParams() {
-  const { createClient } = await import('@supabase/supabase-js')
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  )
+  const supabase = createOptionalPublicClient()
+  if (!supabase) {
+    return []
+  }
 
   const { data: articles } = await supabase
     .from('articles')
@@ -46,7 +45,14 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }) {
   try {
-    const supabase = createPublicClient()
+    const supabase = createOptionalPublicClient()
+    if (!supabase) {
+      return {
+        title: 'Article - EkahNews',
+        robots: { index: false, follow: false },
+      }
+    }
+
     const { articleSlug } = params
 
     const { data: article } = await supabase
@@ -154,7 +160,11 @@ export async function generateMetadata({ params }) {
 
 export default async function ArticlePage({ params }) {
   try {
-    const supabase = createPublicClient()
+    const supabase = createOptionalPublicClient()
+    if (!supabase) {
+      notFound()
+    }
+
     const { categorySlug, articleSlug } = params
     const siteUrl = SITE_URL
 
@@ -634,7 +644,6 @@ export default async function ArticlePage({ params }) {
     notFound()
   }
 }
-
 
 
 

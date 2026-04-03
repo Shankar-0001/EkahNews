@@ -87,8 +87,11 @@ async function canMutateStory(supabase, storyId, user) {
 
 export async function GET(_request, { params }) {
   try {
-    await requireAuth()
+    const user = await requireAuth()
     const supabase = await createClient()
+    const allowed = await canMutateStory(supabase, params.id, user)
+    if (!allowed) return apiResponse(403, null, 'Forbidden')
+
     const { data, error } = await supabase
       .from('web_stories')
       .select(STORY_SELECT)
@@ -263,7 +266,6 @@ export async function DELETE(_request, { params }) {
     return apiResponse(500, null, error.message || 'Failed to delete story')
   }
 }
-
 
 
 

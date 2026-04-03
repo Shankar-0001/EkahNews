@@ -2,7 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { Clock3, User } from 'lucide-react'
 import { format, formatDistanceToNow } from 'date-fns'
-import { createPublicClient } from '@/lib/supabase/public-server'
+import { createOptionalPublicClient } from '@/lib/supabase/public-server'
 import PublicHeader from '@/components/layout/PublicHeader'
 
 export const revalidate = 600
@@ -17,37 +17,39 @@ function getArticleHref(article) {
 }
 
 export default async function LatestNewsPage() {
-  const supabase = createPublicClient()
+  const supabase = createOptionalPublicClient()
 
   let categories = []
   let articles = []
 
-  try {
-    const [categoriesRes, articlesRes] = await Promise.all([
-      supabase
-        .from('categories')
-        .select('id, name, slug')
-        .order('name'),
-      supabase
-        .from('articles')
-        .select(`
-          id,
-          title,
-          slug,
-          excerpt,
-          featured_image_url,
-          published_at,
-          authors (name),
-          categories (name, slug)
-        `)
-        .eq('status', 'published')
-        .order('published_at', { ascending: false }),
-    ])
+  if (supabase) {
+    try {
+      const [categoriesRes, articlesRes] = await Promise.all([
+        supabase
+          .from('categories')
+          .select('id, name, slug')
+          .order('name'),
+        supabase
+          .from('articles')
+          .select(`
+            id,
+            title,
+            slug,
+            excerpt,
+            featured_image_url,
+            published_at,
+            authors (name),
+            categories (name, slug)
+          `)
+          .eq('status', 'published')
+          .order('published_at', { ascending: false }),
+      ])
 
-    categories = categoriesRes.data || []
-    articles = articlesRes.data || []
-  } catch (error) {
-    console.error('Latest news page fetch failed:', error)
+      categories = categoriesRes.data || []
+      articles = articlesRes.data || []
+    } catch (error) {
+      console.error('Latest news page fetch failed:', error)
+    }
   }
 
   return (

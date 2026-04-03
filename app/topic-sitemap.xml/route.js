@@ -1,4 +1,4 @@
-import { createPublicClient } from '@/lib/supabase/public-server'
+import { createOptionalPublicClient } from '@/lib/supabase/public-server'
 import { absoluteUrl } from '@/lib/site-config'
 import { urlsetXml, xmlResponse } from '@/lib/sitemap-utils'
 
@@ -45,7 +45,11 @@ function buildPhraseCountMap(articles = []) {
 }
 
 export async function GET() {
-  const supabase = createPublicClient()
+  const supabase = createOptionalPublicClient()
+  if (!supabase) {
+    return xmlResponse(urlsetXml([]))
+  }
+
   const publishedAfterIso = new Date(Date.now() - ARTICLE_LOOKBACK_DAYS * 24 * 60 * 60 * 1000).toISOString()
 
   const [{ data: trendRows }, { data: articleRows }] = await Promise.all([
@@ -79,5 +83,4 @@ export async function GET() {
 
   return xmlResponse(urlsetXml(entries))
 }
-
 

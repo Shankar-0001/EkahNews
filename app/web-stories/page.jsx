@@ -1,4 +1,4 @@
-import { createPublicClient } from '@/lib/supabase/public-server'
+import { createOptionalPublicClient } from '@/lib/supabase/public-server'
 import PublicHeader from '@/components/layout/PublicHeader'
 import WebStoryCard from '@/components/content/WebStoryCard'
 import Breadcrumb from '@/components/common/Breadcrumb'
@@ -29,16 +29,20 @@ export const metadata = {
 }
 
 export default async function WebStoriesPage() {
-  const supabase = createPublicClient()
+  const supabase = createOptionalPublicClient()
 
   const [{ data: categories }, { data: stories }] = await Promise.all([
-    supabase.from('categories').select('id, name, slug').order('name'),
     supabase
-      .from('web_stories')
-      .select('id, title, slug, cover_image, cover_image_alt, published_at, authors(name), categories(name, slug)')
-      .eq('status', 'published')
-      .order('published_at', { ascending: false })
-      .limit(24),
+      ? supabase.from('categories').select('id, name, slug').order('name')
+      : Promise.resolve({ data: [] }),
+    supabase
+      ? supabase
+        .from('web_stories')
+        .select('id, title, slug, cover_image, cover_image_alt, published_at, authors(name), categories(name, slug)')
+        .eq('status', 'published')
+        .order('published_at', { ascending: false })
+        .limit(24)
+      : Promise.resolve({ data: [] }),
   ])
 
   const schema = {
@@ -68,6 +72,5 @@ export default async function WebStoriesPage() {
     </div>
   )
 }
-
 
 

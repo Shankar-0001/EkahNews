@@ -1,10 +1,21 @@
-import { createPublicClient } from '@/lib/supabase/public-server'
+import { createOptionalPublicClient } from '@/lib/supabase/public-server'
 import { getArticleCanonicalUrl, SITE_URL } from '@/lib/site-config'
 
 export const revalidate = 3600
 
 export default async function sitemap() {
-  const supabase = createPublicClient()
+  const supabase = createOptionalPublicClient()
+
+  if (!supabase) {
+    return [
+      {
+        url: SITE_URL,
+        lastModified: new Date(),
+        changeFrequency: 'daily',
+        priority: 1.0,
+      },
+    ]
+  }
 
   const [
     { data: categories },
@@ -136,5 +147,4 @@ export default async function sitemap() {
 
   return [...deduped.values()]
 }
-
 

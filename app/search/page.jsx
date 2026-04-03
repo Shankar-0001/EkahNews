@@ -1,4 +1,4 @@
-import { createPublicClient } from '@/lib/supabase/public-server'
+import { createOptionalPublicClient } from '@/lib/supabase/public-server'
 import PublicHeader from '@/components/layout/PublicHeader'
 import ArticleMiniCard from '@/components/content/ArticleMiniCard'
 import { notFound } from 'next/navigation'
@@ -22,11 +22,13 @@ export async function generateMetadata({ searchParams }) {
 
 export default async function SearchPage({ searchParams }) {
   const query = searchParams?.q
-  const supabase = createPublicClient()
-  const { data: categories } = await supabase
-    .from('categories')
-    .select('id, name, slug')
-    .order('name')
+  const supabase = createOptionalPublicClient()
+  const { data: categories } = supabase
+    ? await supabase
+      .from('categories')
+      .select('id, name, slug')
+      .order('name')
+    : { data: [] }
 
   if (!query) {
     return (
@@ -38,6 +40,10 @@ export default async function SearchPage({ searchParams }) {
         </div>
       </div>
     )
+  }
+
+  if (!supabase) {
+    notFound()
   }
 
   const { data: articles, error } = await supabase
@@ -71,4 +77,3 @@ export default async function SearchPage({ searchParams }) {
     </div>
   )
 }
-

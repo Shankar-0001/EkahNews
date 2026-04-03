@@ -136,6 +136,10 @@ export async function POST(request) {
 
                 targetUserId = invitedUserId
             } else {
+                if (existingUser.role === 'admin') {
+                    return apiResponse(409, null, 'Cannot convert an existing admin account into an author')
+                }
+
                 const { error: roleUpdateError } = await admin
                     .from('users')
                     .update({ role: 'author' })
@@ -314,6 +318,5 @@ export async function DELETE(request) {
         return apiResponse(500, null, 'Internal server error')
     }
 }
-
 
 

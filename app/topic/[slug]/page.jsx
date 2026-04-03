@@ -1,4 +1,4 @@
-import { createPublicClient } from '@/lib/supabase/public-server'
+import { createOptionalPublicClient } from '@/lib/supabase/public-server'
 import PublicHeader from '@/components/layout/PublicHeader'
 import ArticleMiniCard from '@/components/content/ArticleMiniCard'
 import StructuredData from '@/components/seo/StructuredData'
@@ -27,10 +27,23 @@ export async function generateMetadata({ params }) {
     return { title: 'Topic Not Found | EkahNews', robots: { index: false, follow: false } }
   }
 
-  const supabase = createPublicClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  )
+  const canonical = absoluteUrl(`/topic/${normalized}`)
+  const title = `${keyword} News and Updates | EkahNews`
+  const description = `Latest news, updates, and explainers about ${keyword} on EkahNews.`
+
+  const supabase = createOptionalPublicClient()
+  if (!supabase) {
+    return {
+      title,
+      description,
+      alternates: { canonical },
+      robots: {
+        index: false,
+        follow: false,
+      },
+    }
+  }
+
   const pattern = keywordPattern(keyword)
   let matchCount = 0
   if (pattern) {
@@ -42,9 +55,6 @@ export async function generateMetadata({ params }) {
     matchCount = count || 0
   }
 
-  const canonical = absoluteUrl(`/topic/${normalized}`)
-  const title = `${keyword} News and Updates | EkahNews`
-  const description = `Latest news, updates, and explainers about ${keyword} on EkahNews.`
   const ogImage = getPublicationLogoUrl()
   const indexable = matchCount >= MIN_MATCH_COUNT
 
@@ -77,10 +87,10 @@ export async function generateMetadata({ params }) {
 
 export async function generateStaticParams() {
   try {
-    const supabase = createPublicClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    )
+    const supabase = createOptionalPublicClient()
+    if (!supabase) {
+      return []
+    }
     const { data: rows } = await supabase
       .from('trending_topics')
       .select('slug')
@@ -94,10 +104,10 @@ export async function generateStaticParams() {
 }
 
 export default async function TopicPage({ params }) {
-  const supabase = createPublicClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  )
+  const supabase = createOptionalPublicClient()
+  if (!supabase) {
+    notFound()
+  }
   const slug = decodeURIComponent(params.slug || '')
   const keyword = slug.replace(/-/g, ' ').trim()
   const normalized = normalizeKeyword(keyword)
@@ -178,6 +188,4 @@ export default async function TopicPage({ params }) {
     </div>
   )
 }
-
-
 

@@ -1,11 +1,15 @@
-import { createPublicClient } from '@/lib/supabase/public-server'
+import { createOptionalPublicClient } from '@/lib/supabase/public-server'
 import { getArticleCanonicalUrl } from '@/lib/site-config'
 import { urlsetXml, xmlResponse } from '@/lib/sitemap-utils'
 
 const MAX_URLS = 50000
 
 export async function GET() {
-  const supabase = createPublicClient()
+  const supabase = createOptionalPublicClient()
+  if (!supabase) {
+    return xmlResponse(urlsetXml([]))
+  }
+
   const { data: rows } = await supabase
     .from('articles')
     .select('slug, canonical_url, updated_at, published_at, categories(slug)')
@@ -22,5 +26,4 @@ export async function GET() {
 
   return xmlResponse(urlsetXml(entries))
 }
-
 

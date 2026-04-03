@@ -75,18 +75,37 @@ function buildStoryPath(slug = '') {
 
 export async function GET(request) {
   try {
-    await requireAuth()
+    const user = await requireAuth()
     const supabase = await createClient()
     const search = new URL(request.url).searchParams
     const page = Math.max(1, Number(search.get('page') || 1))
     const limit = Math.min(50, Math.max(1, Number(search.get('limit') || 24)))
     const from = (page - 1) * limit
     const to = from + limit - 1
-    const { data, count, error } = await supabase
+    let query = supabase
       .from('web_stories')
       .select(STORY_SELECT, { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(from, to)
+
+    if (user.role !== 'admin') {
+      const authorId = await getUserAuthorId(user.userId)
+      if (!authorId) {
+        return apiResponse(200, {
+          stories: [],
+          pagination: {
+            page,
+            limit,
+            total: 0,
+            pages: 0,
+          },
+        })
+      }
+
+      query = query.eq('author_id', authorId)
+    }
+
+    const { data, count, error } = await query
     if (error) return apiResponse(500, null, error.message)
     return apiResponse(200, {
       stories: data || [],
@@ -224,7 +243,6 @@ export async function POST(request) {
     return apiResponse(500, null, error.message || 'Failed to create story')
   }
 }
-
 
 
 

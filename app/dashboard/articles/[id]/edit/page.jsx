@@ -23,6 +23,7 @@ import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import KeywordInput from '@/components/dashboard/KeywordInput'
 import TagInput from '@/components/dashboard/TagInput'
+import ArticlePublishingChecklist from '@/components/dashboard/ArticlePublishingChecklist'
 import {
     AlertDialog,
     AlertDialogAction,
@@ -77,6 +78,15 @@ function validateSubmissionReadiness({
         if (!seoDescription.trim()) return 'SEO description is required before submission'
     }
     return ''
+}
+
+function RequiredLabel({ children }) {
+    return (
+        <span className="inline-flex items-center gap-1">
+            <span>{children}</span>
+            <span className="text-red-600 dark:text-red-400">*</span>
+        </span>
+    )
 }
 
 export default function EditArticlePage() {
@@ -551,10 +561,14 @@ export default function EditArticlePage() {
             </div>
 
             <div className="space-y-6">
+                <ArticlePublishingChecklist contentType={schemaType === 'BlogPosting' ? 'article' : 'news'} userRole={userRole} />
+
                 {/* Title */}
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-lg">Article Title</CardTitle>
+                        <CardTitle className="text-lg">
+                            <RequiredLabel>Article Title</RequiredLabel>
+                        </CardTitle>
                     </CardHeader>
                     <CardContent>
                         <Input
@@ -563,6 +577,9 @@ export default function EditArticlePage() {
                             onChange={(e) => handleTitleChange(e.target.value)}
                             className="text-lg"
                         />
+                        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                            This is required for every draft, review submission, and published story.
+                        </p>
                     </CardContent>
                 </Card>
 
@@ -588,7 +605,9 @@ export default function EditArticlePage() {
                 {/* Excerpt */}
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-lg">Excerpt</CardTitle>
+                        <CardTitle className="text-lg">
+                            <RequiredLabel>Excerpt</RequiredLabel>
+                        </CardTitle>
                     </CardHeader>
                     <CardContent>
                         <Textarea
@@ -598,6 +617,9 @@ export default function EditArticlePage() {
                             rows={3}
                             className="resize-none"
                         />
+                        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                            Required before review or publish. Keep it clear and summary-focused.
+                        </p>
                     </CardContent>
                 </Card>
 
@@ -605,7 +627,9 @@ export default function EditArticlePage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-lg">Category</CardTitle>
+                            <CardTitle className="text-lg">
+                                <RequiredLabel>Category</RequiredLabel>
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <Select value={categoryId} onValueChange={val => setCategoryId(val === 'none' ? '' : val)}>
@@ -648,7 +672,9 @@ export default function EditArticlePage() {
                 {/* Featured Image */}
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-lg">Featured Image</CardTitle>
+                        <CardTitle className="text-lg">
+                            <RequiredLabel>Featured Image</RequiredLabel>
+                        </CardTitle>
                     </CardHeader>
                     <CardContent>
                         <Input
@@ -674,13 +700,18 @@ export default function EditArticlePage() {
                             onChange={(e) => setFeaturedImage(e.target.value)}
                         />
                         <div className="mt-4">
-                            <Label>Alt Text</Label>
+                            <Label>
+                                <RequiredLabel>Alt Text</RequiredLabel>
+                            </Label>
                             <Input
                                 value={featuredImageAlt}
                                 onChange={(e) => setFeaturedImageAlt(e.target.value)}
                                 placeholder="Describe the image for accessibility and SEO"
                             />
                         </div>
+                        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                            Use the uploader so the image is registered in the media library before review or publish.
+                        </p>
                         {featuredImage && (
                             <div className="mt-4 relative w-full h-48 rounded-lg overflow-hidden border">
                                 <img
@@ -712,7 +743,9 @@ export default function EditArticlePage() {
                 {/* Editor */}
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-lg">Content</CardTitle>
+                        <CardTitle className="text-lg">
+                            <RequiredLabel>Content</RequiredLabel>
+                        </CardTitle>
                     </CardHeader>
                     <CardContent>
                         <TipTapEditor
@@ -720,6 +753,9 @@ export default function EditArticlePage() {
                             onChange={setContent}
                             onImageUpload={handleImageUpload}
                         />
+                        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                            The body content is required before you can move beyond draft.
+                        </p>
                     </CardContent>
                 </Card>
 
@@ -730,7 +766,9 @@ export default function EditArticlePage() {
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div>
-                            <Label>SEO Title</Label>
+                            <Label>
+                                <RequiredLabel>SEO Title</RequiredLabel>
+                            </Label>
                             <Input
                                 placeholder={title || 'SEO title...'}
                                 value={seoTitle}
@@ -741,7 +779,9 @@ export default function EditArticlePage() {
                             </p>
                         </div>
                         <div>
-                            <Label>SEO Description</Label>
+                            <Label>
+                                <RequiredLabel>SEO Description</RequiredLabel>
+                            </Label>
                             <Textarea
                                 placeholder={excerpt || 'SEO description...'}
                                 value={seoDescription}
@@ -812,6 +852,9 @@ export default function EditArticlePage() {
                             />
                         </div>
                     </CardContent>
+                    <div className="px-6 pb-6 text-xs text-gray-500 dark:text-gray-400">
+                        Fields marked with <span className="font-semibold text-red-600 dark:text-red-400">*</span> are required before review or publish.
+                    </div>
                 </Card>
 
                 {/* Status (Admin only) */}
@@ -894,7 +937,6 @@ export default function EditArticlePage() {
         </div>
     )
 }
-
 
 
 

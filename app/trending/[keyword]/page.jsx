@@ -1,4 +1,4 @@
-import { createPublicClient } from '@/lib/supabase/public-server'
+import { createOptionalPublicClient } from '@/lib/supabase/public-server'
 import PublicHeader from '@/components/layout/PublicHeader'
 import StructuredData from '@/components/seo/StructuredData'
 import ArticleMiniCard from '@/components/content/ArticleMiniCard'
@@ -22,10 +22,10 @@ function keywordPattern(keyword = '') {
 
 export async function generateStaticParams() {
   try {
-    const supabase = createPublicClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    )
+    const supabase = createOptionalPublicClient()
+    if (!supabase) {
+      return []
+    }
 
     const { data: trendRows } = await supabase
       .from('trending_topics')
@@ -47,10 +47,14 @@ export async function generateMetadata({ params }) {
     return { title: 'Trending | EkahNews', robots: { index: false, follow: false } }
   }
 
-  const supabase = createPublicClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  )
+  const supabase = createOptionalPublicClient()
+  if (!supabase) {
+    return {
+      title: `${keyword} News, Updates and Explanation`,
+      description: `Latest news, updates and analysis about ${keyword}`,
+      robots: { index: false, follow: false },
+    }
+  }
   const pattern = keywordPattern(keyword)
   const [{ data: trendRow }, { count }] = await Promise.all([
     supabase
@@ -101,10 +105,10 @@ export default async function TrendingKeywordPage({ params }) {
   const keywordSlug = decodeURIComponent(params.keyword || '')
   const keyword = keywordSlug.replace(/-/g, ' ').trim()
   const keywordLower = keyword.toLowerCase()
-  const supabase = createPublicClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  )
+  const supabase = createOptionalPublicClient()
+  if (!supabase) {
+    notFound()
+  }
   const normalizedRequested = slugFromText(keyword)
   const pattern = keywordPattern(keyword)
 
@@ -137,7 +141,7 @@ export default async function TrendingKeywordPage({ params }) {
     supabase.from('trending_topics').select('keyword, slug, search_volume, created_at, updated_at').order('search_volume', { ascending: false }).limit(10),
     articlesQuery,
     supabase.from('article_engagement').select('article_id, views, likes, shares').limit(10),
-    supabase.from('web_stories').select('id, title, slug, cover_image, slides, created_at').order('created_at', { ascending: false }).limit(10),
+    supabase.from('web_stories').select('id, title, slug, cover_image, slides, created_at').eq('status', 'published').order('created_at', { ascending: false }).limit(10),
   ])
 
   const trendKeyword = requestedTrend || (trendRows || []).find((row) => row.slug === normalizedRequested)

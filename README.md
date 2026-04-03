@@ -102,11 +102,12 @@ CREATE POLICY "Users can delete their own media" ON storage.objects
 
 ### 3. Environment Variables
 
-All environment variables are already configured in `/app/.env.local`:
+Create a root-level `.env.local` from `.env.local.example` and fill in your project values:
 ```
-NEXT_PUBLIC_SUPABASE_URL=https://bjlohhikzoxzviwmpucv.supabase.co
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 SUPABASE_SERVICE_ROLE_KEY=...
+NEXT_PUBLIC_BASE_URL=http://localhost:3000
 ```
 
 ### 4. Start the Application
@@ -251,4 +252,3 @@ The application is already running on:
 - [ ] Create RSS feed
 
 ## License
-

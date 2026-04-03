@@ -21,6 +21,10 @@ export async function POST(request) {
       .maybeSingle()
 
     if (existingUser?.id) {
+      if (existingUser.role === 'admin') {
+        return apiResponse(409, null, 'Cannot convert an existing admin account into an author')
+      }
+
       await admin
         .from('users')
         .update({ role: 'author' })

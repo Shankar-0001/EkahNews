@@ -1,4 +1,4 @@
-import { createPublicClient } from '@/lib/supabase/public-server'
+import { createOptionalPublicClient } from '@/lib/supabase/public-server'
 import PublicHeader from '@/components/layout/PublicHeader'
 import StructuredData from '@/components/seo/StructuredData'
 import ArticleMiniCard from '@/components/content/ArticleMiniCard'
@@ -23,10 +23,10 @@ function keywordPattern(keyword = '') {
 
 export async function generateStaticParams() {
   try {
-    const supabase = createPublicClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    )
+    const supabase = createOptionalPublicClient()
+    if (!supabase) {
+      return []
+    }
     const { data: rows } = await supabase
       .from('trending_topics')
       .select('slug')
@@ -47,10 +47,14 @@ export async function generateMetadata({ params }) {
     return { title: 'Explained | EkahNews', robots: { index: false, follow: false } }
   }
 
-  const supabase = createPublicClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  )
+  const supabase = createOptionalPublicClient()
+  if (!supabase) {
+    return {
+      title: `${keyword} Explained | EkahNews`,
+      description: `Simple explainers and latest context for ${keyword}, with linked source articles.`,
+      robots: { index: false, follow: false },
+    }
+  }
   const pattern = keywordPattern(keyword)
   let matchCount = 0
   if (pattern) {
@@ -115,10 +119,10 @@ export default async function ExplainedKeywordPage({ params }) {
   if (normalized !== raw) {
     permanentRedirect(`/explained/${normalized}`)
   }
-  const supabase = createPublicClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  )
+  const supabase = createOptionalPublicClient()
+  if (!supabase) {
+    notFound()
+  }
   const pattern = keywordPattern(keyword)
 
   const articlesQuery = supabase
