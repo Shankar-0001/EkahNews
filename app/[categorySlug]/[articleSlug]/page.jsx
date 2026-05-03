@@ -334,10 +334,6 @@ export default async function ArticlePage({ params }) {
   }
 
   if (!article) {
-    console.error('Article fetch returned no data:', {
-      slug: articleSlug,
-      category: categorySlug,
-    })
     notFound()
   }
 

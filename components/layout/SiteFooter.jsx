@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import { ArrowRight, Facebook, Instagram, Linkedin, Mail, Sparkles, Youtube } from 'lucide-react'
-import { usePathname } from 'next/navigation'
 
 function normalizeSocialUrl(url = '') {
   const value = String(url || '').trim()
@@ -12,13 +11,6 @@ function normalizeSocialUrl(url = '') {
 }
 
 export default function SiteFooter() {
-  const pathname = usePathname() || ''
-  const isAmpStoryPath = pathname.startsWith('/web-stories/') && pathname !== '/web-stories'
-
-  if (isAmpStoryPath) {
-    return null
-  }
-
   const socialLinks = {
     instagram: normalizeSocialUrl(process.env.NEXT_PUBLIC_INSTAGRAM_URL),
     linkedin: normalizeSocialUrl(process.env.NEXT_PUBLIC_LINKEDIN_URL),
