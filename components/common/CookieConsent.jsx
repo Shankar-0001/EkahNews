@@ -10,8 +10,8 @@ export default function CookieConsent() {
 
   useEffect(() => {
     setMounted(true)
-    const storedConsent = window.localStorage.getItem(STORAGE_KEY)
-    setVisible(!storedConsent)
+    const consent = localStorage.getItem(STORAGE_KEY)
+    if (!consent) setVisible(true)
   }, [])
 
   const updateConsent = (value) => {
@@ -26,7 +26,8 @@ export default function CookieConsent() {
     }
   }
 
-  if (!mounted || !visible) return null
+  if (!mounted) return null
+  if (!visible) return null
 
   return (
     <div

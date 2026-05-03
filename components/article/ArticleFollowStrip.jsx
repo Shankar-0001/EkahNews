@@ -90,6 +90,7 @@ export default function ArticleFollowStrip({ articleUrl, articleTitle }) {
         href={followHref}
         {...getAnchorPropsForHref(followHref, { nofollowExternal: false })}
         className="inline-flex h-[40px] w-[110px] items-center justify-between gap-2 rounded-xl border-2 border-slate-300 bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+        aria-label="Follow EkahNews on our official social profile"
       >
         <span className="truncate">Follow us</span>
         <Plus className="h-3.5 w-3.5 shrink-0" />
@@ -101,7 +102,7 @@ export default function ArticleFollowStrip({ articleUrl, articleTitle }) {
           href={target.href}
           {...getAnchorPropsForHref(target.href, { nofollowExternal: false })}
           className="inline-flex h-[40px] w-[38px] items-center justify-center rounded-xl border-2 border-slate-300 bg-slate-100 text-slate-500 shadow-sm transition-colors hover:bg-slate-200 hover:text-slate-800 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white"
-          aria-label={target.label}
+          aria-label={`Share ${articleTitle || 'this article'} on ${target.label}`}
         >
           {target.icon}
         </a>

@@ -15,7 +15,7 @@ export default function Breadcrumb({ items }) {
     <>
       <StructuredData data={BreadcrumbSchema(schemaItems)} />
       <nav className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400 mb-6">
-        <Link href="/" className="hover:text-blue-600 dark:hover:text-blue-400">
+        <Link href="/" aria-label="Go to homepage" className="hover:text-blue-600 dark:hover:text-blue-400">
           <Home className="h-4 w-4" />
         </Link>
         {items.map((item, index) => (
