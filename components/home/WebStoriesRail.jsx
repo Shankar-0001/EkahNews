@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import WebStoryCard from '@/components/content/WebStoryCard'
 
@@ -10,7 +10,12 @@ const SIDE_BUTTON_CLASS = 'hidden md:inline-flex absolute top-1/2 z-10 h-10 w-10
 
 export default function WebStoriesRail({ stories = [] }) {
   const scrollRef = useRef(null)
+  const [mounted, setMounted] = useState(false)
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const visibleStories = useMemo(() => stories.slice(0, visibleCount), [stories, visibleCount])
   const canLoadMore = visibleCount < stories.length
@@ -25,7 +30,7 @@ export default function WebStoriesRail({ stories = [] }) {
     })
   }
 
-  if (stories.length === 0) return null
+  if (!mounted || stories.length === 0) return null
 
   return (
     <div className="relative overflow-visible rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
