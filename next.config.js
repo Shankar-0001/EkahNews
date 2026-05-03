@@ -7,6 +7,8 @@ function buildCsp() {
     supabaseOrigin,
     'https://cdn.ampproject.org',
     'https://www.google-analytics.com',
+    'https://*.analytics.google.com',
+    'https://*.googletagmanager.com',
     'https://region1.google-analytics.com',
     'https://pagead2.googlesyndication.com',
     'https://googleads.g.doubleclick.net',

@@ -55,7 +55,14 @@ export default function CookieConsent() {
         }}
       >
         <p style={{ margin: 0, fontSize: '14px', lineHeight: 1.6 }}>
-          We use cookies to improve your experience and serve personalized ads. See our Privacy Policy.
+          We use cookies and similar technologies to improve your experience, analyze traffic, and serve personalized ads. By clicking "Accept", you consent to the use of cookies. Third-party vendors, including Google, may use cookies to serve ads based on your browsing activity. Learn more in our{' '}
+          <a
+            href="https://www.ekahnews.com/privacy-policy"
+            style={{ color: '#2563eb', textDecoration: 'underline' }}
+          >
+            Privacy Policy
+          </a>
+          .
         </p>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <button
