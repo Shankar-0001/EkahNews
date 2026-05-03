@@ -37,14 +37,7 @@ import { X, Eye, Save, Trash2, AlertTriangle } from 'lucide-react'
 import { createSlug } from '@/lib/slug'
 import Link from 'next/link'
 import Image from 'next/image'
-
-function findLatestNewsCategory(categories = []) {
-    return (
-        categories.find((category) => category.slug === 'latest-news')
-        || categories.find((category) => category.name?.trim().toLowerCase() === 'latest news')
-        || null
-    )
-}
+import { filterEditorialCategories, isFeedOnlyCategorySlug } from '@/lib/category-utils'
 
 function getApiErrorMessage(errorPayload, fallbackMessage) {
     if (!errorPayload) return fallbackMessage
@@ -236,13 +229,14 @@ export default function EditArticlePage() {
             }
 
             const resolvedCategories = categoriesData || []
-            const latestNewsCategory = findLatestNewsCategory(resolvedCategories)
+            const editorialCategories = filterEditorialCategories(resolvedCategories)
+            const currentCategory = resolvedCategories.find((category) => category.id === articleData.category_id)
+            const visibleCategories = isFeedOnlyCategorySlug(currentCategory?.slug)
+                ? [currentCategory, ...editorialCategories.filter((category) => category.id !== currentCategory.id)]
+                : editorialCategories
 
-            setCategories(resolvedCategories)
+            setCategories(visibleCategories)
             setTags(tagsData || [])
-            if (!articleData.category_id && latestNewsCategory?.id) {
-                setCategoryId(latestNewsCategory.id)
-            }
 
             setLoading(false)
         } catch (err) {
@@ -655,7 +649,7 @@ export default function EditArticlePage() {
                                     <SelectItem value="none">None</SelectItem>
                                     {categories.map(cat => (
                                         <SelectItem key={cat.id} value={cat.id}>
-                                            {cat.name}
+                                            {isFeedOnlyCategorySlug(cat.slug) ? `${cat.name} (legacy feed category)` : cat.name}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
@@ -962,6 +956,4 @@ export default function EditArticlePage() {
         </div>
     )
 }
-
-
 

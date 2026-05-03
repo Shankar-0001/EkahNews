@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { FileText, FolderOpen, Tag, Users, ArrowRight, Plus } from 'lucide-react'
-import { formatDistanceToNow } from 'date-fns'
+import { format } from 'date-fns'
 import DashboardAnalyticsCharts from '@/components/dashboard/DashboardAnalyticsCharts'
 
 export const revalidate = 0
@@ -137,6 +137,13 @@ export default async function DashboardPage() {
     }
   }
 
+  const formatCreatedAt = (value) => {
+    if (!value) return ''
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return ''
+    return format(date, 'MMM d, yyyy h:mm a')
+  }
+
   return (
     <div className="space-y-6 lg:space-y-8">
       {/* Welcome Section */}
@@ -201,7 +208,7 @@ export default async function DashboardPage() {
                           {article.title}
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {article.authors?.name} - {formatDistanceToNow(new Date(article.created_at), { addSuffix: true })}
+                          {article.authors?.name} - {formatCreatedAt(article.created_at)}
                         </p>
                       </div>
                       <Badge className={`ml-2 ${getStatusColor(article.status)} capitalize text-xs`}>
@@ -267,4 +274,3 @@ export default async function DashboardPage() {
     </div>
   )
 }
-

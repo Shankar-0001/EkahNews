@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Plus, Edit, MoreVertical, Eye } from 'lucide-react'
-import { formatDistanceToNow } from 'date-fns'
+import { format } from 'date-fns'
 import { ArticleActions } from '@/components/dashboard/ArticleActions'
 
 export const revalidate = 0
@@ -52,6 +52,13 @@ export default async function ArticlesPage({ searchParams }) {
       default:
         return 'bg-blue-50 text-blue-700 border-blue-200'
     }
+  }
+
+  const formatCreatedAt = (value) => {
+    if (!value) return ''
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return ''
+    return format(date, 'MMM d, yyyy h:mm a')
   }
 
   return (
@@ -109,7 +116,7 @@ export default async function ArticlesPage({ searchParams }) {
                         )}
                         <span className="flex items-center">
                           <span className="w-1 h-1 bg-gray-400 rounded-full mr-2"></span>
-                          {formatDistanceToNow(new Date(article.created_at), { addSuffix: true })}
+                          {formatCreatedAt(article.created_at)}
                         </span>
                       </div>
                     </div>

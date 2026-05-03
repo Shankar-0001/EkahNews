@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/dialog'
 import { Eye, Save, Send, CheckCircle, AlertTriangle } from 'lucide-react'
 import { createSlug } from '@/lib/slug'
+import { filterEditorialCategories, isFeedOnlyCategorySlug } from '@/lib/category-utils'
 
 const TipTapEditor = dynamic(() => import('@/components/editor/TipTapEditor'), {
   ssr: false,
@@ -42,14 +43,6 @@ const TipTapEditor = dynamic(() => import('@/components/editor/TipTapEditor'), {
 })
 
 const ARTICLE_DRAFT_STORAGE_KEY = 'ekahnews:new-article-draft'
-
-function findLatestNewsCategory(categories = []) {
-  return (
-    categories.find((category) => category.slug === 'latest-news')
-    || categories.find((category) => category.name?.trim().toLowerCase() === 'latest news')
-    || null
-  )
-}
 
 function getApiErrorMessage(errorPayload, fallbackMessage) {
   if (!errorPayload) return fallbackMessage
@@ -268,7 +261,7 @@ export default function ArticleEditorPage() {
       }
 
       const resolvedCategories = categoriesData || []
-      const latestNewsCategory = findLatestNewsCategory(resolvedCategories)
+      const editorialCategories = filterEditorialCategories(resolvedCategories)
       const savedDraft = typeof window !== 'undefined'
         ? window.localStorage.getItem(ARTICLE_DRAFT_STORAGE_KEY)
         : null
@@ -281,7 +274,7 @@ export default function ArticleEditorPage() {
         }
       }
 
-      setCategories(resolvedCategories)
+      setCategories(editorialCategories)
       setTags(tagsData || [])
       setSelectedAuthorId(parsedDraft?.selectedAuthorId || authorData.id)
 
@@ -291,7 +284,13 @@ export default function ArticleEditorPage() {
         setSlug(parsedDraft.slug || '')
         setExcerpt(parsedDraft.excerpt || '')
         setContent(parsedDraft.content || { json: null, html: '' })
-        setCategoryId(parsedDraft.categoryId || latestNewsCategory?.id || '')
+        setCategoryId(
+          parsedDraft.categoryId && !isFeedOnlyCategorySlug(
+            resolvedCategories.find((category) => category.id === parsedDraft.categoryId)?.slug
+          )
+            ? parsedDraft.categoryId
+            : ''
+        )
         setSelectedTags(Array.isArray(parsedDraft.selectedTags) ? parsedDraft.selectedTags : [])
         setFeaturedImage(parsedDraft.featuredImage || '')
         setFeaturedImageAlt(parsedDraft.featuredImageAlt || '')
@@ -305,8 +304,6 @@ export default function ArticleEditorPage() {
         setStatus(parsedDraft.status || 'published')
         setPublishDate(parsedDraft.publishDate || '')
         setUpdatedDate(parsedDraft.updatedDate || '')
-      } else if (latestNewsCategory?.id) {
-        setCategoryId(latestNewsCategory.id)
       }
       setInitializing(false)
     } catch (err) {
@@ -742,7 +739,7 @@ export default function ArticleEditorPage() {
                   <SelectItem value="none">None</SelectItem>
                   {categories.map(cat => (
                     <SelectItem key={cat.id} value={cat.id}>
-                      {cat.name}
+                      {isFeedOnlyCategorySlug(cat.slug) ? `${cat.name} (legacy feed category)` : cat.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

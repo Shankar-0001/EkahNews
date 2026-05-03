@@ -1,6 +1,6 @@
 import { createOptionalPublicClient } from '@/lib/supabase/public-server'
 import { getArticleCanonicalUrl, SITE_URL } from '@/lib/site-config'
-import { filterBlockedCategories, isBlockedCategorySlug } from '@/lib/category-utils'
+import { filterEditorialCategories, isBlockedCategorySlug } from '@/lib/category-utils'
 
 export const revalidate = 3600
 
@@ -88,7 +88,7 @@ export default async function sitemap() {
       .in('id', tagIds)
     : { data: [] }
 
-  const categoryHubEntries = filterBlockedCategories(categories || []).filter((category) => category?.slug).map((category) => ({
+  const categoryHubEntries = filterEditorialCategories(categories || []).filter((category) => category?.slug).map((category) => ({
     url: `${SITE_URL}/category/${category.slug}`,
     lastModified: new Date(category.updated_at),
     changeFrequency: 'hourly',
