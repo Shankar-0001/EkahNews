@@ -117,7 +117,10 @@ export default function NewAuthorPage() {
 
             const result = await response.json()
             if (!response.ok) {
-                const message = result?.error || 'Failed to create author'
+                const fieldMessage = result?.data?.fields
+                    ? Object.values(result.data.fields).find(Boolean)
+                    : ''
+                const message = fieldMessage || result?.error || 'Failed to create author'
                 if (response.status === 409) {
                     setErrorMessage('This user already has an author profile.')
                 } else {

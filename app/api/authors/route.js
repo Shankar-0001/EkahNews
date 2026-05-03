@@ -214,7 +214,7 @@ export async function POST(request) {
         return apiResponse(201, { author })
     } catch (error) {
         if (error.name === 'ValidationError') {
-            return apiResponse(422, null, error.message)
+            return apiResponse(422, { fields: error.fields || {} }, error.message)
         }
         if (error.name === 'ConfigError') {
             logger.error(requestId, error)
@@ -293,7 +293,7 @@ export async function PATCH(request) {
         return apiResponse(200, { author })
     } catch (error) {
         if (error.name === 'ValidationError') {
-            return apiResponse(422, null, error.message)
+            return apiResponse(422, { fields: error.fields || {} }, error.message)
         }
         if (error.name === 'ConfigError') {
             logger.error(requestId, error)

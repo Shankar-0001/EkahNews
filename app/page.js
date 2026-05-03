@@ -13,7 +13,7 @@ import SchemaScript from '@/components/seo/SchemaScript'
 import { runListQuery } from '@/lib/supabase/query-timeout'
 import { formatArticleCardDate } from '@/lib/date-utils'
 
-export const revalidate = 600
+export const revalidate = 300
 
 const HOMEPAGE_CATEGORY_LIMIT = 6
 const CATEGORY_SECTION_ARTICLES = 3

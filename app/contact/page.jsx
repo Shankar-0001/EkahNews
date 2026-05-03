@@ -78,6 +78,57 @@ export default async function ContactPage() {
             </p>
           </div>
         )}
+        {(contact.email || contact.editorialEmail || contact.correctionsEmail || contact.phone || contact.whatsapp || contact.address) && (
+          <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-white">How to reach us</h2>
+            <div className="mt-4 space-y-3 text-sm text-slate-700 dark:text-slate-300">
+              {contact.email && (
+                <p>
+                  <span className="font-semibold text-slate-900 dark:text-white">General:</span>{' '}
+                  <a className="text-blue-600 hover:underline dark:text-blue-400" href={`mailto:${contact.email}`}>
+                    {contact.email}
+                  </a>
+                </p>
+              )}
+              {contact.editorialEmail && contact.editorialEmail !== contact.email && (
+                <p>
+                  <span className="font-semibold text-slate-900 dark:text-white">Editorial:</span>{' '}
+                  <a className="text-blue-600 hover:underline dark:text-blue-400" href={`mailto:${contact.editorialEmail}`}>
+                    {contact.editorialEmail}
+                  </a>
+                </p>
+              )}
+              {contact.correctionsEmail && contact.correctionsEmail !== contact.email && contact.correctionsEmail !== contact.editorialEmail && (
+                <p>
+                  <span className="font-semibold text-slate-900 dark:text-white">Corrections:</span>{' '}
+                  <a className="text-blue-600 hover:underline dark:text-blue-400" href={`mailto:${contact.correctionsEmail}`}>
+                    {contact.correctionsEmail}
+                  </a>
+                </p>
+              )}
+              {contact.phone && (
+                <p>
+                  <span className="font-semibold text-slate-900 dark:text-white">Phone:</span>{' '}
+                  <a className="text-blue-600 hover:underline dark:text-blue-400" href={`tel:${contact.phone}`}>
+                    {contact.phone}
+                  </a>
+                </p>
+              )}
+              {contact.whatsapp && (
+                <p>
+                  <span className="font-semibold text-slate-900 dark:text-white">WhatsApp tipline:</span>{' '}
+                  {contact.whatsapp}
+                </p>
+              )}
+              {contact.address && (
+                <p>
+                  <span className="font-semibold text-slate-900 dark:text-white">Address:</span>{' '}
+                  {contact.address}
+                </p>
+              )}
+            </div>
+          </section>
+        )}
       </main>
     </div>
   )

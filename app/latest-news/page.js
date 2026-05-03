@@ -6,7 +6,7 @@ import { createOptionalPublicClient } from '@/lib/supabase/public-server'
 import PublicHeader from '@/components/layout/PublicHeader'
 import { formatArticleCardDate } from '@/lib/date-utils'
 
-export const revalidate = 600
+export const revalidate = 300
 
 export const metadata = {
   title: 'Latest News - EkahNews',

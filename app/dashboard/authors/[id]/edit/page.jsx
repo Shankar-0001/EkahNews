@@ -149,7 +149,10 @@ export default function EditAuthorPage() {
 
             const result = await response.json()
             if (!response.ok) {
-                throw new Error(result.error || 'Failed to update author')
+                const fieldMessage = result?.data?.fields
+                    ? Object.values(result.data.fields).find(Boolean)
+                    : ''
+                throw new Error(fieldMessage || result.error || 'Failed to update author')
             }
 
             alert('Author updated successfully!')
