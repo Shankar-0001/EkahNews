@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound, permanentRedirect } from 'next/navigation'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Calendar, Globe, Linkedin, Twitter } from 'lucide-react'
 import Link from 'next/link'
@@ -12,6 +11,7 @@ import StructuredData from '@/components/seo/StructuredData'
 import { absoluteUrl } from '@/lib/site-config'
 import { getAnchorPropsForHref } from '@/lib/link-policy'
 import SchemaScript from '@/components/seo/SchemaScript'
+import AuthorAvatar from '@/components/common/AuthorAvatar'
 import { getPersonSchema } from '@/lib/schema'
 import { filterBlockedCategories } from '@/lib/category-utils'
 
@@ -229,12 +229,7 @@ export default async function AuthorProfilePage({ params }) {
         <Card className="mb-8 dark:bg-gray-800 dark:border-gray-700">
           <CardHeader className="text-center py-12">
             <div className="flex flex-col items-center">
-              <Avatar className="h-32 w-32 mb-4" suppressHydrationWarning>
-                <AvatarImage src={author.avatar_url} />
-                <AvatarFallback className="text-2xl">
-                  {author.name.split(' ').map(n => n[0]).join('')}
-                </AvatarFallback>
-              </Avatar>
+              <AuthorAvatar name={author.name} avatarUrl={author.avatar_url} />
               <h1 className="text-4xl font-bold mb-2 dark:text-white">{author.name}</h1>
               {author.title && (
                 <p className="text-lg text-gray-600 dark:text-gray-400 mb-4">{author.title}</p>

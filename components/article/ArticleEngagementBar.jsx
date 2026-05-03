@@ -5,12 +5,19 @@ import { Heart, Eye, Share2, Link as LinkIcon, Facebook, Twitter, Linkedin } fro
 
 export default function ArticleEngagementBar({ articleId, articleUrl, articleTitle, type = 'article' }) {
   const [metrics, setMetrics] = useState({ views: 0, likes: 0, shares: 0 })
+  const [formattedMetrics, setFormattedMetrics] = useState({ views: 0, likes: 0, shares: 0 })
   const [busy, setBusy] = useState(false)
-
-  const formatMetric = (value) => (Number.isFinite(value) ? value.toLocaleString() : '0')
 
   const encodedUrl = useMemo(() => encodeURIComponent(articleUrl), [articleUrl])
   const encodedTitle = useMemo(() => encodeURIComponent(articleTitle || ''), [articleTitle])
+
+  useEffect(() => {
+    setFormattedMetrics({
+      views: Number.isFinite(metrics.views) ? metrics.views.toLocaleString() : '0',
+      likes: Number.isFinite(metrics.likes) ? metrics.likes.toLocaleString() : '0',
+      shares: Number.isFinite(metrics.shares) ? metrics.shares.toLocaleString() : '0',
+    })
+  }, [metrics.likes, metrics.shares, metrics.views])
 
   useEffect(() => {
     if (!articleId) return
@@ -71,11 +78,11 @@ export default function ArticleEngagementBar({ articleId, articleUrl, articleTit
   return (
     <section className="mb-8 border border-border bg-card p-4 shadow-sm">
       <div className="flex flex-wrap items-center gap-4 text-sm text-gray-700 dark:text-gray-300">
-        <span className="inline-flex items-center gap-1.5"><Eye className="h-4 w-4" /> {formatMetric(metrics.views)}</span>
+        <span className="inline-flex items-center gap-1.5"><Eye className="h-4 w-4" /> {formattedMetrics.views}</span>
         <button onClick={() => performAction('like')} className="inline-flex items-center gap-1.5 hover:text-red-600">
-          <Heart className="h-4 w-4" /> {formatMetric(metrics.likes)}
+          <Heart className="h-4 w-4" /> {formattedMetrics.likes}
         </button>
-        <span className="inline-flex items-center gap-1.5"><Share2 className="h-4 w-4" /> {formatMetric(metrics.shares)}</span>
+        <span className="inline-flex items-center gap-1.5"><Share2 className="h-4 w-4" /> {formattedMetrics.shares}</span>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <button onClick={() => openShare(`https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`)} className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium inline-flex items-center gap-1.5 hover:bg-accent"><Facebook className="h-3.5 w-3.5" /> Facebook</button>
@@ -87,4 +94,3 @@ export default function ArticleEngagementBar({ articleId, articleUrl, articleTit
     </section>
   )
 }
-
