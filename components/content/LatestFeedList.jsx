@@ -22,7 +22,7 @@ function getItemHref(item) {
     : `/${item.categories?.slug || 'news'}/${item.slug}`
 }
 
-function LatestArticleRow({ item }) {
+function LatestArticleRow({ item, formattedDate = '' }) {
   return (
     <Link
       href={getItemHref(item)}
@@ -47,9 +47,7 @@ function LatestArticleRow({ item }) {
       <div className="min-w-0 py-1">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
           <span>{item.categories?.name || 'News'}</span>
-          {item.published_at && (
-            <span>{format(new Date(item.published_at), 'MMM d, yyyy')}</span>
-          )}
+          {formattedDate && <span>{formattedDate}</span>}
         </div>
 
         <h2 className="mt-2 text-xl font-bold leading-snug text-slate-900 dark:text-white">
@@ -81,7 +79,7 @@ function LatestArticleRow({ item }) {
   )
 }
 
-function LatestWebStoryRow({ item }) {
+function LatestWebStoryRow({ item, formattedDate = '' }) {
   return (
     <Link
       href={getItemHref(item)}
@@ -107,9 +105,7 @@ function LatestWebStoryRow({ item }) {
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
           <span className="font-semibold text-[#d62828] dark:text-red-400">Web Story</span>
           {item.categories?.name && <span>{item.categories.name}</span>}
-          {item.published_at && (
-            <span>{format(new Date(item.published_at), 'MMM d, yyyy')}</span>
-          )}
+          {formattedDate && <span>{formattedDate}</span>}
         </div>
 
         <h2 className="mt-2 text-xl font-bold leading-snug text-slate-900 dark:text-white">
@@ -139,10 +135,10 @@ function LatestWebStoryRow({ item }) {
   )
 }
 
-function FeedRow({ item }) {
+function FeedRow({ item, formattedDate = '' }) {
   return item?._type === 'web_story'
-    ? <LatestWebStoryRow item={item} />
-    : <LatestArticleRow item={item} />
+    ? <LatestWebStoryRow item={item} formattedDate={formattedDate} />
+    : <LatestArticleRow item={item} formattedDate={formattedDate} />
 }
 
 export default function LatestFeedList({
@@ -155,6 +151,7 @@ export default function LatestFeedList({
   const [hasMore, setHasMore] = useState(initialHasMore)
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
+  const [formattedDates, setFormattedDates] = useState({})
   const sentinelRef = useRef(null)
   const shouldRenderInlineAd = useMemo(() => {
     const slotIds = getAdSlotIds()
@@ -206,6 +203,15 @@ export default function LatestFeedList({
   }, [currentPage, hasMore, loading, pageSize])
 
   useEffect(() => {
+    const nextDates = {}
+    items.forEach((item) => {
+      if (!item?.published_at) return
+      nextDates[getFeedItemKey(item)] = format(new Date(item.published_at), 'MMM d, yyyy')
+    })
+    setFormattedDates(nextDates)
+  }, [items])
+
+  useEffect(() => {
     if (!sentinelRef.current || !hasMore) return
 
     const observer = new IntersectionObserver(
@@ -232,7 +238,7 @@ export default function LatestFeedList({
     <section className="space-y-4">
       {items.map((item, index) => (
         <div key={getFeedItemKey(item)}>
-          <FeedRow item={item} />
+          <FeedRow item={item} formattedDate={formattedDates[getFeedItemKey(item)] || ''} />
           {shouldRenderInlineAd && (index + 1) % AD_INSERT_FREQUENCY === 0 && index < items.length - 1 && (
             <div className="border-b border-slate-200 py-4 dark:border-slate-800">
               <InArticleAd />

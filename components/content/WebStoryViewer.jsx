@@ -54,10 +54,10 @@ export default function WebStoryViewer({ story, articleUrl }) {
   const [index, setIndex] = useState(0)
   const [metrics, setMetrics] = useState({ views: 0, likes: 0, shares: 0 })
   const [touchStartX, setTouchStartX] = useState(null)
+  const [storyTime, setStoryTime] = useState('')
 
   const authorName = story?.authors?.name || 'EkahNews'
   const categoryName = story?.categories?.name || 'News'
-  const storyTime = formatStoryTime(story?.published_at || story?.updated_at)
   const current = slides[index] || {}
   const isCoverSlide = Boolean(current?.isCover)
   const whatsappHref = isValidWhatsappUrl(current?.whatsapp_group_url) ? current.whatsapp_group_url.trim() : ''
@@ -73,6 +73,10 @@ export default function WebStoryViewer({ story, articleUrl }) {
   const progressWidth = `${((index + 1) / Math.max(1, slides.length)) * 100}%`
   const ctaLinkProps = getAnchorPropsForHref(ctaHref)
   const whatsappLinkProps = getAnchorPropsForHref(whatsappHref)
+
+  useEffect(() => {
+    setStoryTime(formatStoryTime(story?.published_at || story?.updated_at))
+  }, [story?.published_at, story?.updated_at])
 
   useEffect(() => {
     if (!story?.id) return

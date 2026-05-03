@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import createDOMPurify from 'dompurify'
 import { applyLinkPolicyToHtml } from '@/lib/link-policy'
 
@@ -21,7 +21,14 @@ function sanitizeClientHtml(html = '', baseUrl) {
 }
 
 export default function SafeHtmlPreview({ html = '', className = '', baseUrl }) {
+  const [mounted, setMounted] = useState(false)
   const sanitizedHtml = useMemo(() => sanitizeClientHtml(html, baseUrl), [baseUrl, html])
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) return null
 
   return <div className={className} dangerouslySetInnerHTML={{ __html: sanitizedHtml }} />
 }

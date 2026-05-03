@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { getAdSlotIds, hasRenderableAdSlot } from '@/lib/ads'
 
 export default function AdComponent({ slot, format = 'auto', responsive = true, className = '' }) {
   const adClientId = process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID
   const canRenderAd = hasRenderableAdSlot(slot)
+  const [mounted, setMounted] = useState(false)
 
   if (!canRenderAd) {
     if (process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_ADS_ENABLED === 'true') {
@@ -15,12 +16,18 @@ export default function AdComponent({ slot, format = 'auto', responsive = true, 
   }
 
   useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (!mounted) return
+
     try {
       ;(window.adsbygoogle = window.adsbygoogle || []).push({})
     } catch (err) {
       console.error('AdSense error:', err)
     }
-  }, [])
+  }, [mounted])
 
   const minHeight = format === 'rectangle'
     ? 250
@@ -29,6 +36,10 @@ export default function AdComponent({ slot, format = 'auto', responsive = true, 
       : format === 'fluid'
         ? 120
         : 90
+
+  if (!mounted) {
+    return <div className={`ad-container ${className}`} style={{ minHeight }} aria-hidden="true" />
+  }
 
   return (
     <div className={`ad-container ${className}`} style={{ minHeight }}>

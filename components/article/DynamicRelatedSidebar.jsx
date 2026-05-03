@@ -23,11 +23,8 @@ function normalizeStory(story) {
   }
 }
 
-function RelatedStoryCard({ story }) {
+function RelatedStoryCard({ story, formattedDate = '' }) {
   const href = `/${story.categorySlug}/${story.slug}`
-  const formattedDate = story.publishedAt
-    ? format(new Date(story.publishedAt), 'MMM d, yyyy')
-    : ''
 
   return (
     <Link
@@ -73,9 +70,19 @@ export default function DynamicRelatedSidebar({
 }) {
   const [stories, setStories] = useState(() => initialRelatedStories.map(normalizeStory).filter(Boolean))
   const [isFading, setIsFading] = useState(false)
+  const [formattedDates, setFormattedDates] = useState({})
   const currentSlugRef = useRef(initialArticleSlug)
 
   const fallbackCategorySlug = useMemo(() => initialCategorySlug || 'news', [initialCategorySlug])
+
+  useEffect(() => {
+    const nextDates = {}
+    stories.forEach((story) => {
+      if (!story?.slug || !story?.publishedAt) return
+      nextDates[story.slug] = format(new Date(story.publishedAt), 'MMM d, yyyy')
+    })
+    setFormattedDates(nextDates)
+  }, [stories])
 
   useEffect(() => {
     const handleArticleChange = async (event) => {
@@ -137,7 +144,7 @@ export default function DynamicRelatedSidebar({
         }}
       >
         {stories.slice(0, 3).map((story) => (
-          <RelatedStoryCard key={story.slug} story={story} />
+          <RelatedStoryCard key={story.slug} story={story} formattedDate={formattedDates[story.slug] || ''} />
         ))}
       </div>
     </div>
