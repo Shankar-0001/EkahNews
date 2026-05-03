@@ -150,6 +150,7 @@ export default function PublicHeader({ categories }) {
               <Link
                 href="/"
                 className={`${desktopMenuLinkClass('/')} px-4 shadow-sm`}
+                suppressHydrationWarning
               >
                 Home
               </Link>
@@ -158,6 +159,7 @@ export default function PublicHeader({ categories }) {
                   key={category.id}
                   href={getCategoryHref(category)}
                   className={desktopMenuLinkClass(getCategoryHref(category))}
+                  suppressHydrationWarning
                 >
                   {category.name}
                 </Link>
@@ -232,6 +234,7 @@ export default function PublicHeader({ categories }) {
                 href="/"
                 className={`${mobileMenuLinkClass('/')} font-semibold`}
                 onClick={() => setMobileMenuOpen(false)}
+                suppressHydrationWarning
               >
                 Home
               </Link>
@@ -241,6 +244,7 @@ export default function PublicHeader({ categories }) {
                   href={getCategoryHref(category)}
                   className={mobileMenuLinkClass(getCategoryHref(category))}
                   onClick={() => setMobileMenuOpen(false)}
+                  suppressHydrationWarning
                 >
                   {category.name}
                 </Link>
