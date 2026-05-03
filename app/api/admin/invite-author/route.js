@@ -61,6 +61,7 @@ export async function POST(request) {
       const status = error.message.includes('Admin') ? 403 : 401
       return apiResponse(status, null, error.message)
     }
-    return apiResponse(500, null, error.message || 'Failed to invite author')
+    console.error(error)
+    return apiResponse(500, null, 'An internal error occurred')
   }
 }

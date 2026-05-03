@@ -14,6 +14,30 @@ function getPaging(url) {
     return { page, limit, from, to }
 }
 
+function normalizeAuthorMetadata(authorData = {}) {
+    const existingSocialLinks = authorData.social_links && typeof authorData.social_links === 'object'
+        ? authorData.social_links
+        : {}
+
+    return {
+        ...authorData,
+        expertise: authorData.expertise?.trim() || null,
+        credentials: authorData.credentials?.trim() || null,
+        beat: authorData.beat?.trim() || null,
+        social_links: {
+            ...existingSocialLinks,
+            expertise: authorData.expertise?.trim() || existingSocialLinks.expertise || null,
+            credentials: authorData.credentials?.trim() || existingSocialLinks.credentials || null,
+            beat: authorData.beat?.trim() || existingSocialLinks.beat || null,
+        },
+    }
+}
+
+function buildAuthorWritePayload(authorData = {}) {
+    const { expertise, credentials, beat, ...rest } = authorData
+    return rest
+}
+
 export async function GET(request) {
     const requestId = 'GET-authors'
 
@@ -61,7 +85,8 @@ export async function GET(request) {
         })
     } catch (error) {
         if (error.name === 'ConfigError') {
-            return apiResponse(500, null, error.message)
+            logger.error(requestId, error)
+            return apiResponse(500, null, 'An internal error occurred')
         }
         if (error.name === 'AuthError') {
             const status = error.message.includes('Admin') ? 403 : 401
@@ -80,7 +105,7 @@ export async function POST(request) {
         const user = await requireAuth()
         logger.info(`[${requestId}] User authenticated`, { userId: user.userId })
 
-        const authorData = await request.json()
+        const authorData = normalizeAuthorMetadata(await request.json())
         validateAuthor(authorData)
 
         const supabase = await createClient()
@@ -173,7 +198,7 @@ export async function POST(request) {
         const { data: author, error } = await db
             .from('authors')
             .insert([{
-                ...authorData,
+                ...buildAuthorWritePayload(authorData),
                 email: normalizedEmail,
                 user_id: targetUserId,
             }])
@@ -192,7 +217,8 @@ export async function POST(request) {
             return apiResponse(422, null, error.message)
         }
         if (error.name === 'ConfigError') {
-            return apiResponse(500, null, error.message)
+            logger.error(requestId, error)
+            return apiResponse(500, null, 'An internal error occurred')
         }
         if (error.name === 'AuthError') {
             return apiResponse(401, null, error.message)
@@ -210,10 +236,11 @@ export async function PATCH(request) {
         const user = await requireAuth()
         logger.info(`[${requestId}] User authenticated`, { userId: user.userId })
 
-        const { id, ...updateData } = await request.json()
+        const { id, ...rawUpdateData } = await request.json()
         if (!id) {
             return apiResponse(400, null, 'Author ID is required')
         }
+        const updateData = normalizeAuthorMetadata(rawUpdateData)
         validateAuthor(updateData)
 
         const supabase = await createClient()
@@ -236,7 +263,7 @@ export async function PATCH(request) {
         const db = admin || supabase
         const { data: author, error } = await db
             .from('authors')
-            .update(updateData)
+            .update(buildAuthorWritePayload(updateData))
             .eq('id', id)
             .select('id, name, slug, bio, title, email, avatar_url, social_links, user_id')
             .maybeSingle()
@@ -269,7 +296,8 @@ export async function PATCH(request) {
             return apiResponse(422, null, error.message)
         }
         if (error.name === 'ConfigError') {
-            return apiResponse(500, null, error.message)
+            logger.error(requestId, error)
+            return apiResponse(500, null, 'An internal error occurred')
         }
         if (error.name === 'AuthError') {
             return apiResponse(401, null, error.message)
@@ -307,7 +335,8 @@ export async function DELETE(request) {
         return apiResponse(200, { success: true })
     } catch (error) {
         if (error.name === 'ConfigError') {
-            return apiResponse(500, null, error.message)
+            logger.error(requestId, error)
+            return apiResponse(500, null, 'An internal error occurred')
         }
         if (error.name === 'AuthError') {
             const status = error.message.includes('Admin') ? 403 : 401
@@ -318,5 +347,3 @@ export async function DELETE(request) {
         return apiResponse(500, null, 'Internal server error')
     }
 }
-
-

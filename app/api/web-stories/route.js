@@ -1,5 +1,5 @@
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { apiResponse } from '@/lib/api-utils'
 import { requireAuth, getUserAuthorId } from '@/lib/auth-utils'
 import { resolveCanonicalUrl, slugFromText } from '@/lib/site-config'
@@ -43,6 +43,7 @@ function deriveStoryCtas(slides = []) {
 }
 
 function revalidateStorySurface(story) {
+  revalidatePath('/tags')
   revalidatePath('/web-stories')
   revalidatePath('/web-stories-sitemap.xml')
   revalidatePath('/sitemap.xml')
@@ -51,7 +52,7 @@ function revalidateStorySurface(story) {
   }
 }
 
-const STORY_SELECT = 'id, title, slug, cover_image, cover_image_alt, slides, author_id, category_id, tags, keywords, related_article_slug, cta_text, cta_url, whatsapp_group_url, ad_slot, seo_title, seo_description, canonical_url, structured_data, status, published_at, created_at, updated_at, authors(name, slug), categories(name, slug)'
+const STORY_SELECT = 'id, title, slug, cover_image, cover_image_alt, slides, author_id, category_id, keywords, related_article_slug, cta_text, cta_url, whatsapp_group_url, ad_slot, seo_title, seo_description, canonical_url, structured_data, status, published_at, created_at, updated_at, authors(name, slug), categories(name, slug), web_story_tags(tag_id, tags(id, name, slug))'
 
 function normalizeStructuredData(value) {
   if (!value) return null
@@ -73,10 +74,63 @@ function buildStoryPath(slug = '') {
   return `/web-stories/${slug}`
 }
 
+function normalizeTagIds(value) {
+  return [...new Set((Array.isArray(value) ? value : []).filter(Boolean))]
+}
+
+async function getTagsByIds(supabase, tagIds = []) {
+  if (!tagIds.length) return []
+
+  const { data: tags } = await supabase
+    .from('tags')
+    .select('id, name, slug')
+    .in('id', tagIds)
+
+  return tags || []
+}
+
+async function syncStoryTags(supabase, storyId, tagIds = []) {
+  const normalizedTagIds = normalizeTagIds(tagIds)
+
+  const { error: deleteError } = await supabase
+    .from('web_story_tags')
+    .delete()
+    .eq('web_story_id', storyId)
+
+  if (deleteError) {
+    throw new Error(deleteError.message)
+  }
+
+  if (normalizedTagIds.length === 0) {
+    return []
+  }
+
+  const { error: insertError } = await supabase
+    .from('web_story_tags')
+    .insert(normalizedTagIds.map((tagId) => ({
+      web_story_id: storyId,
+      tag_id: tagId,
+    })))
+
+  if (insertError) {
+    throw new Error(insertError.message)
+  }
+
+  return getTagsByIds(supabase, normalizedTagIds)
+}
+
+function revalidateTagSurfaces(tags = []) {
+  for (const tag of tags) {
+    if (tag?.slug) {
+      revalidatePath(`/tags/${tag.slug}`)
+    }
+  }
+}
+
 export async function GET(request) {
   try {
     const user = await requireAuth()
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     const search = new URL(request.url).searchParams
     const page = Math.max(1, Number(search.get('page') || 1))
     const limit = Math.min(50, Math.max(1, Number(search.get('limit') || 24)))
@@ -118,16 +172,18 @@ export async function GET(request) {
     })
   } catch (error) {
     if (error.name === 'AuthError') return apiResponse(401, null, error.message)
-    return apiResponse(500, null, error.message || 'Failed to fetch stories')
+    console.error('Web stories GET error:', error)
+    return apiResponse(500, null, 'An internal error occurred')
   }
 }
 
 export async function POST(request) {
   try {
     const user = await requireAuth()
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     const payload = await request.json()
     const keywords = normalizeManualKeywords(payload.keywords || [])
+    const tagIds = normalizeTagIds(payload.tags)
     let authorId = normalizeSelectedId(payload.author_id)
     const categoryId = normalizeSelectedId(payload.category_id)
     const ownAuthorId = await getUserAuthorId(user.userId)
@@ -213,7 +269,6 @@ export async function POST(request) {
       slides,
       author_id: authorId,
       category_id: categoryId,
-      tags: Array.isArray(payload.tags) ? payload.tags : [],
       keywords,
       related_article_slug: payload.related_article_slug || null,
       cta_text: storyCtas.cta_text,
@@ -236,17 +291,19 @@ export async function POST(request) {
       .single()
     if (error) return apiResponse(500, null, error.message)
 
+    const syncedTags = tagIds.length > 0
+      ? await syncStoryTags(supabase, data.id, tagIds)
+      : []
+
     revalidateStorySurface(data)
+    revalidateTagSurfaces(syncedTags)
     return apiResponse(201, { story: data })
   } catch (error) {
     if (error.name === 'AuthError') return apiResponse(401, null, error.message)
-    return apiResponse(500, null, error.message || 'Failed to create story')
+    console.error('Web stories POST error:', error)
+    return apiResponse(500, null, 'An internal error occurred')
   }
 }
-
-
-
-
 
 
 

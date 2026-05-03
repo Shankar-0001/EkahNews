@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
@@ -286,10 +287,12 @@ export default function MediaLibraryPage() {
               {/* Preview */}
               <div className="aspect-square bg-gray-100 overflow-hidden relative group">
                 {item.file_type.startsWith('image/') ? (
-                  <img
+                  <Image
                     src={item.file_url}
                     alt={item.filename}
-                    className="w-full h-full object-cover"
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, (max-width: 1280px) 33vw, 25vw"
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-200 to-gray-300">

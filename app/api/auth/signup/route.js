@@ -2,9 +2,34 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { desiredRoleForEmail } from '@/lib/role-utils'
 import { isPublicSignupEnabled } from '@/lib/auth-config'
+import { checkRateLimit, getClientIp } from '@/lib/request-guards'
 
 export async function POST(request) {
     try {
+        const rateResult = checkRateLimit({
+            key: `${getClientIp(request)}:auth:signup`,
+            limit: 5,
+            windowMs: 60 * 60 * 1000,
+        })
+
+        if (!rateResult.allowed) {
+            return new Response(
+                JSON.stringify({
+                    success: false,
+                    status: 429,
+                    error: 'Too many signup attempts. Please try again later.',
+                    timestamp: new Date().toISOString(),
+                }),
+                {
+                    status: 429,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Retry-After': String(Math.max(1, Math.ceil((rateResult.resetAt - Date.now()) / 1000))),
+                    },
+                }
+            )
+        }
+
         if (!isPublicSignupEnabled()) {
             return NextResponse.json({ error: 'Public signup is disabled' }, { status: 403 })
         }
@@ -31,7 +56,7 @@ export async function POST(request) {
             return NextResponse.json({ error: 'User creation failed' }, { status: 400 })
         }
 
-        const role = desiredRoleForEmail(email)
+        const role = desiredRoleForEmail(email) || 'author'
 
         const { error: upsertError } = await supabase
             .from('users')

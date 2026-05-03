@@ -3,6 +3,7 @@ import PublicHeader from '@/components/layout/PublicHeader'
 import ArticleMiniCard from '@/components/content/ArticleMiniCard'
 import { notFound } from 'next/navigation'
 import { absoluteUrl } from '@/lib/site-config'
+import { filterBlockedCategories } from '@/lib/category-utils'
 
 export const revalidate = 900
 
@@ -29,11 +30,12 @@ export default async function SearchPage({ searchParams }) {
       .select('id, name, slug')
       .order('name')
     : { data: [] }
+  const filteredCategories = filterBlockedCategories(categories || [])
 
   if (!query) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-        <PublicHeader categories={categories || []} />
+        <PublicHeader categories={filteredCategories} />
         <div className="max-w-6xl mx-auto px-4 py-10">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Search</h1>
           <p className="text-gray-600 dark:text-gray-400">Please enter a search term.</p>
@@ -60,7 +62,7 @@ export default async function SearchPage({ searchParams }) {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <PublicHeader categories={categories || []} />
+      <PublicHeader categories={filteredCategories} />
       <main className="max-w-6xl mx-auto px-4 py-10">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{`Search results for "${query}"`}</h1>
 

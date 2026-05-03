@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createOptionalPublicClient } from '@/lib/supabase/public-server'
 import { getArticleCanonicalUrl } from '@/lib/site-config'
+import { isBlockedCategorySlug } from '@/lib/category-utils'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 300
 
 const NEWS_WINDOW_MS = 48 * 60 * 60 * 1000
 const MAX_URLS = 1000
@@ -46,7 +47,7 @@ export async function GET() {
 
   const seenUrls = new Set()
   const urls = (articles || [])
-    .filter((article) => article?.slug && article?.published_at)
+    .filter((article) => article?.slug && article?.published_at && !isBlockedCategorySlug(article.categories?.slug))
     .map((article) => {
       const articleUrl = getArticleCanonicalUrl(article)
       if (seenUrls.has(articleUrl)) {
@@ -83,8 +84,7 @@ export async function GET() {
   return new NextResponse(xml, {
     headers: {
       'Content-Type': 'application/xml; charset=utf-8',
-      'Cache-Control': 'no-store, max-age=0',
+      'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
     },
   })
 }
-

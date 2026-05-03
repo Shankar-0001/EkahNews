@@ -6,6 +6,7 @@ import { absoluteUrl, buildLanguageAlternates, getPublicationLogoUrl, slugFromTe
 import { notFound, permanentRedirect } from 'next/navigation'
 import { stripHtml } from '@/lib/content-utils'
 import Link from 'next/link'
+import { filterBlockedCategories } from '@/lib/category-utils'
 
 export const revalidate = 1200
 const MIN_MATCH_COUNT = 3
@@ -144,6 +145,7 @@ export default async function ExplainedKeywordPage({ params }) {
   ])
 
   const matched = articles || []
+  const filteredCategories = filterBlockedCategories(categories || [])
   if (!trendRow && matched.length < MIN_MATCH_COUNT) notFound()
 
   let fallbackArticles = []
@@ -187,7 +189,7 @@ export default async function ExplainedKeywordPage({ params }) {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <StructuredData data={jsonLd} />
-      <PublicHeader categories={categories || []} />
+      <PublicHeader categories={filteredCategories} />
       <main className="w-full max-w-6xl mx-auto px-4 py-10">
         <h1 className="text-3xl font-bold mb-2 text-gray-900 dark:text-white">{keyword} Explained</h1>
         <p className="text-gray-600 dark:text-gray-400 mb-8">

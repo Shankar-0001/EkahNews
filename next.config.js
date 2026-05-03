@@ -48,9 +48,15 @@ function buildCsp() {
 
 const nextConfig = {
   output: 'standalone',
+  trailingSlash: false,
   images: {
     unoptimized: false,
     remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'bjlohhikzoxzviwmpucv.supabase.co',
+        pathname: '/storage/v1/object/public/**',
+      },
       {
         protocol: 'https',
         hostname: '**.supabase.co',
@@ -62,6 +68,10 @@ const nextConfig = {
         pathname: '/**',
       },
     ],
+    deviceSizes: [320, 480, 640, 750, 828, 1080, 1200, 1920, 2048],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256],
+    formats: ['image/avif', 'image/webp'],
+    minimumCacheTTL: 86400,
   },
   experimental: {
     serverComponentsExternalPackages: ['mongodb'],
@@ -98,7 +108,57 @@ const nextConfig = {
     return [
       {
         source: '/(.*)',
-        headers,
+        headers: [
+          ...headers,
+          { key: 'X-XSS-Protection', value: '1; mode=block' },
+        ],
+      },
+      {
+        source: '/news-sitemap.xml',
+        headers: [
+          { key: 'Cache-Control', value: 'public, s-maxage=300, stale-while-revalidate=600' },
+        ],
+      },
+      {
+        source: '/sitemap.xml',
+        headers: [
+          { key: 'Cache-Control', value: 'public, s-maxage=3600, stale-while-revalidate=7200' },
+        ],
+      },
+    ]
+  },
+  async redirects() {
+    return [
+      {
+        source: '/:path*',
+        has: [{ type: 'host', value: 'ekahnews.com' }],
+        destination: 'https://www.ekahnews.com/:path*',
+        permanent: true,
+      },
+      {
+        source: '/category/tech-news',
+        destination: '/category/technology',
+        permanent: true,
+      },
+      {
+        source: '/category/tech-news/:path*',
+        destination: '/category/technology',
+        permanent: true,
+      },
+      {
+        source: '/category/latest-news',
+        destination: '/news',
+        permanent: false,
+      },
+      {
+        source: '/privacy',
+        destination: '/privacy-policy',
+        permanent: true,
+      },
+      {
+        source: '/terms',
+        destination: '/terms-of-service',
+        permanent: true,
       },
     ]
   },

@@ -6,6 +6,7 @@ import { requireRequestAuth, getUserAuthorId } from '@/lib/auth-utils'
 import { sanitizeRichText } from '@/lib/security-utils'
 import { normalizeManualKeywords } from '@/lib/keywords'
 import { validateArticlePublishReadiness } from '@/lib/article-publish-validation'
+import { checkRateLimit, getClientIp } from '@/lib/request-guards'
 
 function normalizeStructuredData(value) {
   if (!value) return null
@@ -20,6 +21,25 @@ function normalizeStructuredData(value) {
   }
 }
 
+function isMissingOgImageColumnError(error) {
+  const message = error?.message || ''
+  return typeof message === 'string'
+    && message.includes('og_image')
+    && message.toLowerCase().includes('column')
+}
+
+async function findDuplicateArticleByTitle(admin, title) {
+  const { data } = await admin
+    .from('articles')
+    .select('id')
+    .in('status', ['draft', 'published'])
+    .ilike('title', title.trim())
+    .limit(1)
+    .maybeSingle()
+
+  return data
+}
+
 function revalidateArticleSurface(article) {
   try {
     const categorySlug = article?.categories?.slug || 'news'
@@ -27,6 +47,7 @@ function revalidateArticleSurface(article) {
       revalidatePath(`/${categorySlug}/${article.slug}`)
     }
     revalidatePath('/')
+    revalidatePath('/latest-news')
     revalidatePath(`/category/${categorySlug}`)
     revalidatePath('/sitemap.xml')
     revalidatePath('/article-sitemap.xml')
@@ -44,15 +65,45 @@ export async function POST(request) {
   const requestId = 'POST-article'
 
   try {
+    const rateResult = checkRateLimit({
+      key: `${getClientIp(request)}:articles:create`,
+      limit: 30,
+      windowMs: 60 * 1000,
+    })
+
+    if (!rateResult.allowed) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          status: 429,
+          error: 'Too many article creation requests. Please try again shortly.',
+          timestamp: new Date().toISOString(),
+        }),
+        {
+          status: 429,
+          headers: {
+            'Content-Type': 'application/json',
+            'Retry-After': String(Math.max(1, Math.ceil((rateResult.resetAt - Date.now()) / 1000))),
+          },
+        }
+      )
+    }
+
     const user = await requireRequestAuth(request)
     logger.info(`[${requestId}] User authenticated`, { userId: user.userId })
 
     const articleData = await request.json()
+    articleData.title = articleData.title?.trim?.() || articleData.title
     articleData.keywords = normalizeManualKeywords(articleData.keywords || [])
     articleData.schema_type = articleData.schema_type || 'NewsArticle'
     validateArticle(articleData)
 
     const admin = createAdminClient()
+    const duplicateArticle = await findDuplicateArticleByTitle(admin, articleData.title)
+    if (duplicateArticle) {
+      return apiResponse(409, null, 'An article with this title already exists. Please use a unique title.')
+    }
+
     let authorId = await getUserAuthorId(user.userId)
 
     if (user.role === 'admin' && articleData.author_id) {
@@ -73,27 +124,45 @@ export async function POST(request) {
 
     await validateArticlePublishReadiness(admin, articleData)
 
+    if (user.role !== 'admin') {
+      articleData.status = 'pending'
+      delete articleData.published_at
+    }
+
     const sanitizedContent = sanitizeRichText(articleData.content)
     const structuredData = normalizeStructuredData(articleData.structured_data)
     const publishedAt = articleData.status === 'published'
       ? (articleData.published_at || new Date().toISOString())
       : (articleData.published_at || null)
+    const insertPayload = {
+      ...articleData,
+      author_id: authorId,
+      content: sanitizedContent,
+      keywords: articleData.keywords,
+      canonical_url: articleData.canonical_url || null,
+      schema_type: articleData.schema_type || 'NewsArticle',
+      structured_data: structuredData,
+      published_at: publishedAt,
+      updated_at: articleData.updated_at || new Date().toISOString(),
+      og_image: articleData.og_image?.trim() || null,
+    }
 
-    const { data: article, error } = await admin
+    let article
+    let error
+    ;({ data: article, error } = await admin
       .from('articles')
-      .insert([{
-        ...articleData,
-        author_id: authorId,
-        content: sanitizedContent,
-        keywords: articleData.keywords,
-        canonical_url: articleData.canonical_url || null,
-        schema_type: articleData.schema_type || 'NewsArticle',
-        structured_data: structuredData,
-        published_at: publishedAt,
-        updated_at: articleData.updated_at || new Date().toISOString(),
-      }])
+      .insert([insertPayload])
       .select('id, title, slug, excerpt, content, content_json, featured_image_url, featured_image_alt, keywords, status, category_id, author_id, seo_title, seo_description, canonical_url, schema_type, structured_data, published_at, created_at, updated_at, categories(slug), authors(slug)')
-      .single()
+      .single())
+
+    if (error && isMissingOgImageColumnError(error)) {
+      const { og_image, ...fallbackPayload } = insertPayload
+      ;({ data: article, error } = await admin
+        .from('articles')
+        .insert([fallbackPayload])
+        .select('id, title, slug, excerpt, content, content_json, featured_image_url, featured_image_alt, keywords, status, category_id, author_id, seo_title, seo_description, canonical_url, schema_type, structured_data, published_at, created_at, updated_at, categories(slug), authors(slug)')
+        .single())
+    }
 
     if (error) {
       logger.error(`[${requestId}] Database error`, error)
@@ -112,6 +181,6 @@ export async function POST(request) {
     }
 
     logger.error(requestId, error)
-    return apiResponse(500, null, error.message || 'Internal server error')
+    return apiResponse(500, null, 'An internal error occurred')
   }
 }

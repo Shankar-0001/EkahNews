@@ -2,24 +2,37 @@ import { createOptionalPublicClient } from '@/lib/supabase/public-server'
 import Link from 'next/link'
 import Image from 'next/image'
 import { ArrowRight, Clock3, TrendingUp, User } from 'lucide-react'
-import { format, formatDistanceToNow } from 'date-fns'
 import StructuredData, { OrganizationSchema, WebSiteSchema } from '@/components/seo/StructuredData'
 import PublicHeader from '@/components/layout/PublicHeader'
+import ContentUnavailableNotice from '@/components/common/ContentUnavailableNotice'
 import ArticleMiniCard from '@/components/content/ArticleMiniCard'
 import WebStoriesRail from '@/components/home/WebStoriesRail'
 import { getPublicationLogoUrl, SITE_URL } from '@/lib/site-config'
+import { filterBlockedCategories } from '@/lib/category-utils'
+import SchemaScript from '@/components/seo/SchemaScript'
+import { runListQuery } from '@/lib/supabase/query-timeout'
+import { formatArticleCardDate } from '@/lib/date-utils'
 
 export const revalidate = 600
 
 const HOMEPAGE_CATEGORY_LIMIT = 6
-const CATEGORY_SECTION_LIMIT = 6
 const CATEGORY_SECTION_ARTICLES = 3
+const HOMEPAGE_CATEGORY_ALLOWLIST = [
+  'cryptocurrency',
+  'technology',
+  'artificial-intelligence',
+  'finance-markets',
+  'science',
+  'entertainment',
+]
+const CATEGORY_SLUG_ALIASES = {
+  'tech-news': 'technology',
+}
 const FOR_YOU_CATEGORIES = [
   { label: 'Entertainment', sourceSlug: 'entertainment' },
   { label: 'Cryptocurrency', sourceSlug: 'cryptocurrency' },
   { label: 'Science', sourceSlug: 'science' },
   { label: 'Sports', sourceSlug: 'sports' },
-  { label: 'Tech News', sourceSlug: 'technology' },
   { label: 'Technology', sourceSlug: 'technology' },
 ]
 
@@ -98,7 +111,7 @@ function HeroMeta({ article, light = false }) {
       {article.published_at && (
         <span className="inline-flex items-center gap-2">
           <Clock3 className={`h-4 w-4 ${iconClass}`} />
-          {formatDistanceToNow(new Date(article.published_at), { addSuffix: true })}
+          {formatArticleCardDate(article.published_at)}
         </span>
       )}
     </div>
@@ -117,6 +130,10 @@ function getAdaptiveHeadlineClass(title = '', {
   return shortClass
 }
 
+function normalizeHomepageCategorySlug(slug = '') {
+  return CATEGORY_SLUG_ALIASES[slug] || slug
+}
+
 export default async function HomePage() {
   const supabase = createOptionalPublicClient()
   const isMissingPublicConfig = !supabase
@@ -130,9 +147,10 @@ export default async function HomePage() {
   if (supabase) {
     try {
     const [articlesRes, categoriesRes, engagementRes, storiesRes, categoryStatsRes] = await Promise.all([
-      supabase
-        .from('articles')
-        .select(`
+      runListQuery(
+        (signal) => supabase
+          .from('articles')
+          .select(`
           id,
           title,
           slug,
@@ -144,67 +162,95 @@ export default async function HomePage() {
         `)
         .eq('status', 'published')
         .order('published_at', { ascending: false })
-        .limit(30),
-      supabase
-        .from('categories')
-        .select('id, name, slug')
-        .order('name'),
-      supabase
-        .from('article_engagement')
-        .select('article_id, views, likes, shares')
-        .limit(30),
-      supabase
-        .from('web_stories')
-        .select('id, title, slug, cover_image, cover_image_alt, published_at, authors(name)')
-        .eq('status', 'published')
-        .order('published_at', { ascending: false })
-        .limit(12),
-      supabase
-        .from('articles')
-        .select('id, category_id, published_at')
-        .eq('status', 'published')
-        .not('category_id', 'is', null)
-        .order('published_at', { ascending: false }),
+        .limit(30)
+        .abortSignal(signal),
+        { label: 'fetchHomepageArticles' }
+      ),
+      runListQuery(
+        (signal) => supabase
+          .from('categories')
+          .select('id, name, slug')
+          .order('name')
+          .abortSignal(signal),
+        { label: 'fetchHomepageCategories' }
+      ),
+      runListQuery(
+        (signal) => supabase
+          .from('article_engagement')
+          .select('article_id, views, likes, shares')
+          .limit(30)
+          .abortSignal(signal),
+        { label: 'fetchHomepageEngagement' }
+      ),
+      runListQuery(
+        (signal) => supabase
+          .from('web_stories')
+          .select('id, title, slug, cover_image, cover_image_alt, published_at, authors(name)')
+          .eq('status', 'published')
+          .order('published_at', { ascending: false })
+          .limit(12)
+          .abortSignal(signal),
+        { label: 'fetchHomepageWebStories' }
+      ),
+      runListQuery(
+        (signal) => supabase
+          .from('articles')
+          .select('id, category_id, published_at')
+          .eq('status', 'published')
+          .not('category_id', 'is', null)
+          .order('published_at', { ascending: false })
+          .abortSignal(signal),
+        { label: 'fetchHomepageCategoryStats' }
+      ),
     ])
 
     articles = articlesRes.data || []
-    categories = categoriesRes.data || []
+    categories = filterBlockedCategories(categoriesRes.data || [])
     engagement = engagementRes.data || []
     webStories = storiesRes.data || []
 
 
-    const categoryMetaById = new Map((categoriesRes.data || []).map((category) => [category.id, category]))
-    const categoryMetaBySlug = new Map((categoriesRes.data || []).map((category) => [category.slug, category]))
+    const categoryMetaById = new Map(categories.map((category) => [category.id, category]))
+    const categoryMetaBySlug = new Map(categories.map((category) => [category.slug, category]))
     const categoryStats = new Map()
+    const categoryIdGroups = new Map()
 
     for (const article of categoryStatsRes.data || []) {
       if (!article?.category_id) continue
-      const existing = categoryStats.get(article.category_id) || {
+      const rawCategory = categoryMetaById.get(article.category_id)
+      const effectiveSlug = normalizeHomepageCategorySlug(rawCategory?.slug || '')
+      const effectiveCategory = categoryMetaBySlug.get(effectiveSlug)
+
+      if (!effectiveCategory) continue
+
+      const existing = categoryStats.get(effectiveSlug) || {
         count: 0,
         latestPublishedAt: article.published_at || null,
       }
 
-      categoryStats.set(article.category_id, {
+      categoryStats.set(effectiveSlug, {
         count: existing.count + 1,
         latestPublishedAt: existing.latestPublishedAt || article.published_at || null,
       })
+
+      const ids = categoryIdGroups.get(effectiveSlug) || new Set()
+      ids.add(article.category_id)
+      categoryIdGroups.set(effectiveSlug, ids)
     }
 
-    const showcaseCategoryIds = [...categoryStats.entries()]
-      .filter(([categoryId, stats]) => categoryMetaById.has(categoryId) && stats.count >= CATEGORY_SECTION_ARTICLES)
-      .sort((a, b) => {
-        const dateA = new Date(a[1].latestPublishedAt || 0).getTime()
-        const dateB = new Date(b[1].latestPublishedAt || 0).getTime()
-        if (dateB !== dateA) return dateB - dateA
-        return (categoryMetaById.get(a[0])?.name || '').localeCompare(categoryMetaById.get(b[0])?.name || '')
-      })
-      .slice(0, CATEGORY_SECTION_LIMIT)
-      .map(([categoryId]) => categoryId)
+    const showcaseCategoryIds = HOMEPAGE_CATEGORY_ALLOWLIST
+      .filter((categorySlug) => categoryMetaBySlug.has(categorySlug) && (categoryStats.get(categorySlug)?.count || 0) > 0)
+      .slice(0, HOMEPAGE_CATEGORY_LIMIT)
 
     if (showcaseCategoryIds.length > 0) {
-      const { data: showcaseArticles } = await supabase
-        .from('articles')
-        .select(`
+      const rawCategoryIds = [...new Set(
+        showcaseCategoryIds.flatMap((categorySlug) => [...(categoryIdGroups.get(categorySlug) || new Set())])
+      )]
+
+      const { data: showcaseArticles } = await runListQuery(
+        (signal) => supabase
+          .from('articles')
+          .select(`
           id,
           title,
           slug,
@@ -215,26 +261,30 @@ export default async function HomePage() {
           categories (name, slug)
         `)
         .eq('status', 'published')
-        .in('category_id', showcaseCategoryIds)
+        .in('category_id', rawCategoryIds)
         .order('published_at', { ascending: false })
+        .abortSignal(signal),
+        { label: 'fetchHomepageShowcaseArticles' }
+      )
 
-      const articlesByCategoryId = new Map()
+      const articlesByCategorySlug = new Map()
 
       for (const article of showcaseArticles || []) {
-        if (!article?.category_id) continue
+        const effectiveSlug = normalizeHomepageCategorySlug(article?.categories?.slug || '')
+        if (!effectiveSlug) continue
 
-        const items = articlesByCategoryId.get(article.category_id) || []
+        const items = articlesByCategorySlug.get(effectiveSlug) || []
         if (items.length < CATEGORY_SECTION_ARTICLES) {
           items.push(article)
-          articlesByCategoryId.set(article.category_id, items)
+          articlesByCategorySlug.set(effectiveSlug, items)
         }
       }
 
       categoryShowcases = showcaseCategoryIds
-        .map((categoryId) => {
-          const category = categoryMetaById.get(categoryId)
-          const items = articlesByCategoryId.get(categoryId) || []
-          if (!category || items.length < CATEGORY_SECTION_ARTICLES) return null
+        .map((categorySlug) => {
+          const category = categoryMetaBySlug.get(categorySlug)
+          const items = articlesByCategorySlug.get(categorySlug) || []
+          if (!category || items.length === 0) return null
 
           return {
             ...category,
@@ -252,9 +302,10 @@ export default async function HomePage() {
       .filter((item) => item.categoryId)
 
     if (forYouConfigs.length > 0) {
-      const { data: forYouArticles } = await supabase
-        .from('articles')
-        .select(`
+      const { data: forYouArticles } = await runListQuery(
+        (signal) => supabase
+          .from('articles')
+          .select(`
           id,
           title,
           slug,
@@ -268,6 +319,9 @@ export default async function HomePage() {
         .eq('status', 'published')
         .in('category_id', [...new Set(forYouConfigs.map((item) => item.categoryId))])
         .order('published_at', { ascending: false })
+        .abortSignal(signal),
+        { label: 'fetchHomepageForYouArticles' }
+      )
 
       const articlesByCategoryId = new Map()
 
@@ -296,6 +350,20 @@ export default async function HomePage() {
   const featuredArticle = articles[0]
   const featuredSidebarStories = articles.slice(1, 5)
   const moreNewsArticles = articles.slice(19, 31)
+  const homepageLeadArticles = articles.slice(0, 10)
+  const itemListSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'Latest News - EkahNews',
+    url: 'https://www.ekahnews.com',
+    numberOfItems: homepageLeadArticles.length,
+    itemListElement: homepageLeadArticles.map((article, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      url: `https://www.ekahnews.com/${article.categories?.slug || 'news'}/${article.slug}`,
+      name: article.title,
+    })),
+  }
 
   const engagementMap = new Map((engagement || []).map((row) => [row.article_id, row]))
   const mostShared = [...articles]
@@ -310,6 +378,7 @@ export default async function HomePage() {
     <>
       <StructuredData data={OrganizationSchema()} />
       <StructuredData data={WebSiteSchema()} />
+      <SchemaScript schema={itemListSchema} />
 
       <div className="bg-[#f8fafc] dark:bg-slate-950">
         <PublicHeader categories={categories || []} />
@@ -320,6 +389,13 @@ export default async function HomePage() {
               Homepage data is empty because `NEXT_PUBLIC_SUPABASE_URL` and/or `NEXT_PUBLIC_SUPABASE_ANON_KEY` is missing.
               Add them to `.env.local` and restart the server.
             </section>
+          )}
+          {!articles.length && (
+            <ContentUnavailableNotice
+              className="my-8"
+              title="Latest stories are temporarily unavailable"
+              message="We are having trouble loading the homepage stories right now. Please refresh the page or check back shortly."
+            />
           )}
           {featuredArticle && (
             <section className="mb-10">
@@ -354,7 +430,7 @@ export default async function HomePage() {
                     </h1>
                     <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-600 dark:text-slate-400">
                       {featuredArticle.published_at && (
-                        <span>{formatDistanceToNow(new Date(featuredArticle.published_at), { addSuffix: true })}</span>
+                        <span>{formatArticleCardDate(featuredArticle.published_at)}</span>
                       )}
                       {featuredArticle.authors?.name && (
                         <span>by {featuredArticle.authors.name}</span>
@@ -381,7 +457,7 @@ export default async function HomePage() {
                           </p>
                           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600 dark:text-slate-400 sm:text-sm">
                             {article.published_at && (
-                              <span>{formatDistanceToNow(new Date(article.published_at), { addSuffix: true })}</span>
+                              <span>{formatArticleCardDate(article.published_at)}</span>
                             )}
                             {article.authors?.name && (
                               <span>by {article.authors.name}</span>
@@ -468,7 +544,7 @@ export default async function HomePage() {
                                       </p>
                                       <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400">
                                         {article.published_at && (
-                                          <span>{formatDistanceToNow(new Date(article.published_at), { addSuffix: true })}</span>
+                                          <span>{formatArticleCardDate(article.published_at)}</span>
                                         )}
                                         {article.authors?.name && (
                                           <span>By {article.authors.name}</span>
@@ -602,7 +678,7 @@ export default async function HomePage() {
                           </p>
                           <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
                             {article.published_at && (
-                              <span>{formatDistanceToNow(new Date(article.published_at), { addSuffix: true })}</span>
+                              <span>{formatArticleCardDate(article.published_at)}</span>
                             )}
                             {article.authors?.name && (
                               <span>By {article.authors.name}</span>
@@ -656,4 +732,3 @@ export default async function HomePage() {
     </>
   )
 }
-

@@ -1,26 +1,55 @@
-import { SITE_URL } from '@/lib/site-config'
-
 export default function robots() {
   return {
     rules: [
       {
         userAgent: '*',
         allow: '/',
-        disallow: ['/dashboard/', '/api/'],
+        disallow: [
+          '/api',
+          '/api/',
+          '/dashboard',
+          '/admin/',
+          '/admin',
+          '/cms/',
+          '/cms',
+          '/dashboard/',
+          '/login/',
+          '/signup/',
+          '/author-panel/',
+          '/login',
+          '/signup',
+          '/_next/',
+          '/category/eijfjka',
+          '/category/kdfjskfj',
+          '/category/skdfjoisk',
+        ],
       },
       {
-        userAgent: 'Googlebot',
+        userAgent: 'Googlebot-News',
         allow: '/',
-        disallow: ['/dashboard/', '/api/'],
+      },
+      {
+        userAgent: 'GPTBot',
+        disallow: ['/'],
+      },
+      {
+        userAgent: 'CCBot',
+        disallow: ['/'],
+      },
+      {
+        userAgent: 'anthropic-ai',
+        disallow: ['/'],
+      },
+      {
+        userAgent: 'Google-Extended',
+        disallow: ['/'],
       },
     ],
     sitemap: [
-      `${SITE_URL}/sitemap.xml`,
-      `${SITE_URL}/article-sitemap.xml`,
-      `${SITE_URL}/news-sitemap.xml`,
-      `${SITE_URL}/category-sitemap.xml`,
-      `${SITE_URL}/topic-sitemap.xml`,
-      `${SITE_URL}/web-stories-sitemap.xml`,
+      'https://www.ekahnews.com/sitemap.xml',
+      'https://www.ekahnews.com/sitemap-index.xml',
+      'https://www.ekahnews.com/news-sitemap.xml',
     ],
+    host: 'https://www.ekahnews.com',
   }
 }

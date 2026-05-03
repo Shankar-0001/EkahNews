@@ -1,12 +1,15 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import { BubbleMenu } from '@tiptap/react/menus'
 import StarterKit from '@tiptap/starter-kit'
+import Link from '@tiptap/extension-link'
 import { Table } from '@tiptap/extension-table'
 import { TableRow } from '@tiptap/extension-table-row'
 import { TableCell } from '@tiptap/extension-table-cell'
 import { TableHeader } from '@tiptap/extension-table-header'
+import Underline from '@tiptap/extension-underline'
 import { Youtube } from '@tiptap/extension-youtube'
 import { Image } from '@tiptap/extension-image'
 import { Button } from '@/components/ui/button'
@@ -27,7 +30,6 @@ import {
   DialogTrigger,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { useState } from 'react'
 
 export default function TipTapEditor({ content, onChange, onImageUpload }) {
   const [linkUrl, setLinkUrl] = useState('')
@@ -44,16 +46,18 @@ export default function TipTapEditor({ content, onChange, onImageUpload }) {
     extensions: [
       StarterKit.configure({
         heading: {
-          levels: [1, 2, 3, 4],
+          levels: [1, 2, 3, 4, 5, 6],
         },
-        link: {
-          openOnClick: false,
-          HTMLAttributes: {
-            class: 'text-blue-600 underline',
-          },
-        },
-        underline: {},
       }),
+      Link.configure({
+        openOnClick: false,
+        autolink: true,
+        defaultProtocol: 'https',
+        HTMLAttributes: {
+          class: 'text-blue-600 underline',
+        },
+      }),
+      Underline,
       Table.configure({
         resizable: true,
       }),
@@ -82,6 +86,19 @@ export default function TipTapEditor({ content, onChange, onImageUpload }) {
       },
     },
   })
+
+  useEffect(() => {
+    if (!editor) return
+
+    const nextContent = content || ''
+    const currentContent = editor.getHTML()
+
+    if (currentContent !== nextContent) {
+      editor.commands.setContent(nextContent, {
+        emitUpdate: false,
+      })
+    }
+  }, [content, editor])
 
   const handleImageFile = async (e) => {
     const file = e.target.files?.[0]
@@ -171,6 +188,24 @@ export default function TipTapEditor({ content, onChange, onImageUpload }) {
           className={editor.isActive('heading', { level: 4 }) ? 'bg-gray-200' : ''}
         >
           <Heading4 className="h-4 w-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => editor.chain().focus().toggleHeading({ level: 5 }).run()}
+          className={editor.isActive('heading', { level: 5 }) ? 'bg-gray-200' : ''}
+        >
+          H5
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => editor.chain().focus().toggleHeading({ level: 6 }).run()}
+          className={editor.isActive('heading', { level: 6 }) ? 'bg-gray-200' : ''}
+        >
+          H6
         </Button>
         <div className="w-px bg-gray-300 mx-1" />
         <Button
@@ -444,6 +479,22 @@ export default function TipTapEditor({ content, onChange, onImageUpload }) {
             aria-label="Heading 4"
           >
             <Heading4 className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().toggleHeading({ level: 5 }).run()}
+            className={`h-8 rounded-full px-2 flex items-center justify-center ${editor.isActive('heading', { level: 5 }) ? 'bg-gray-200' : 'hover:bg-gray-100'}`}
+            aria-label="Heading 5"
+          >
+            H5
+          </button>
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().toggleHeading({ level: 6 }).run()}
+            className={`h-8 rounded-full px-2 flex items-center justify-center ${editor.isActive('heading', { level: 6 }) ? 'bg-gray-200' : 'hover:bg-gray-100'}`}
+            aria-label="Heading 6"
+          >
+            H6
           </button>
           <div className="mx-1 h-5 w-px bg-gray-200" />
           <button

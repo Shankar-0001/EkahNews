@@ -1,9 +1,34 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { desiredRoleForEmail } from '@/lib/role-utils'
+import { checkRateLimit, getClientIp } from '@/lib/request-guards'
 
 export async function POST(request) {
     try {
+        const rateResult = checkRateLimit({
+            key: `${getClientIp(request)}:auth:login`,
+            limit: 10,
+            windowMs: 15 * 60 * 1000,
+        })
+
+        if (!rateResult.allowed) {
+            return new Response(
+                JSON.stringify({
+                    success: false,
+                    status: 429,
+                    error: 'Too many login attempts. Please try again later.',
+                    timestamp: new Date().toISOString(),
+                }),
+                {
+                    status: 429,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Retry-After': String(Math.max(1, Math.ceil((rateResult.resetAt - Date.now()) / 1000))),
+                    },
+                }
+            )
+        }
+
         const { email, password } = await request.json()
 
         const supabase = await createClient()
@@ -29,7 +54,7 @@ export async function POST(request) {
                 return NextResponse.json({ error: 'Failed to load user profile' }, { status: 500 })
             }
 
-            const nextRole = desiredRoleForEmail(user.email, userRow?.role)
+            const nextRole = desiredRoleForEmail(user.email, userRow?.role) || 'author'
 
             if (nextRole !== userRow?.role) {
                 const { error: updateRoleError } = await supabase

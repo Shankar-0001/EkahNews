@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
@@ -7,6 +7,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useTheme } from 'next-themes'
 import { usePathname, useRouter } from 'next/navigation'
+import { filterBlockedCategories } from '@/lib/category-utils'
+
+const HIDDEN_MENU_CATEGORY_SLUGS = new Set(['tech-news', 'latest-news'])
 
 export default function PublicHeader({ categories }) {
   const { resolvedTheme, setTheme } = useTheme()
@@ -16,6 +19,8 @@ export default function PublicHeader({ categories }) {
   const desktopMenuRef = useRef(null)
   const router = useRouter()
   const pathname = usePathname()
+  const visibleCategories = filterBlockedCategories(categories || [])
+    .filter((category) => !HIDDEN_MENU_CATEGORY_SLUGS.has(category?.slug))
 
   useEffect(() => {
     setMounted(true)
@@ -148,7 +153,7 @@ export default function PublicHeader({ categories }) {
               >
                 Home
               </Link>
-              {(categories || []).map((category) => (
+              {visibleCategories.map((category) => (
                 <Link
                   key={category.id}
                   href={getCategoryHref(category)}
@@ -230,7 +235,7 @@ export default function PublicHeader({ categories }) {
               >
                 Home
               </Link>
-              {categories?.map((category) => (
+              {visibleCategories.map((category) => (
                 <Link
                   key={category.id}
                   href={getCategoryHref(category)}

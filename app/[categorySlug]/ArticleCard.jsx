@@ -2,8 +2,8 @@ import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Calendar, User } from 'lucide-react'
-import { formatDistanceToNow } from 'date-fns'
 import Image from 'next/image'
+import { formatArticleCardDate } from '@/lib/date-utils'
 
 export default function ArticleCard({ article }) {
     return (
@@ -43,7 +43,7 @@ export default function ArticleCard({ article }) {
                             <div className="flex items-center gap-2">
                                 <Calendar className="h-4 w-4" />
                                 <span>
-                                    {formatDistanceToNow(new Date(article.published_at), { addSuffix: true })}
+                                    {formatArticleCardDate(article.published_at)}
                                 </span>
                             </div>
                         </div>

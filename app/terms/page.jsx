@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import SafeHtml from '@/components/SafeHtml'
 import PublicHeader from '@/components/layout/PublicHeader'
 import { getRenderableHtml, getStaticPageDefinition, getStaticPageOverride } from '@/lib/static-pages'
+import { filterBlockedCategories } from '@/lib/category-utils'
 
 export async function generateMetadata() {
   const definition = getStaticPageDefinition('terms')
@@ -10,6 +11,8 @@ export async function generateMetadata() {
   return {
     title: override?.seo_title || definition?.seoTitle || 'Terms of Service - EkahNews',
     description: override?.seo_description || definition?.seoDescription || 'Terms of service for EkahNews.',
+    robots: { index: false, follow: false },
+    alternates: { canonical: 'https://www.ekahnews.com/terms-of-service' },
   }
 }
 
@@ -19,6 +22,7 @@ export default async function TermsPage() {
     .from('categories')
     .select('id, name, slug')
     .order('name')
+  const filteredCategories = filterBlockedCategories(categories || [])
 
   const override = await getStaticPageOverride('terms')
   const pageTitle = override?.title || 'Terms of Service'
@@ -26,13 +30,13 @@ export default async function TermsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <PublicHeader categories={categories || []} />
+      <PublicHeader categories={filteredCategories} />
       <main className="w-full max-w-6xl mx-auto px-4 py-10">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{pageTitle}</h1>
         {contentHtml ? (
           <SafeHtml
             html={contentHtml}
-            className="mt-6 prose prose-slate dark:prose-invert max-w-none"
+            className="static-page-content mt-6 max-w-none"
           />
         ) : (
           <div className="mt-6 space-y-4 text-gray-700 dark:text-gray-300">

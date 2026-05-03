@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { createSlug } from '@/lib/slug'
+import Image from 'next/image'
 
 function normalizeExternalUrl(url) {
     const value = url?.trim()
@@ -29,6 +30,9 @@ export default function NewAuthorPage() {
     const [slug, setSlug] = useState('')
     const [email, setEmail] = useState('')
     const [bio, setBio] = useState('')
+    const [expertise, setExpertise] = useState('')
+    const [credentials, setCredentials] = useState('')
+    const [beat, setBeat] = useState('')
     const [title, setTitle] = useState('')
     const [avatarUrl, setAvatarUrl] = useState('')
     const [errorMessage, setErrorMessage] = useState('')
@@ -92,6 +96,9 @@ export default function NewAuthorPage() {
                 slug,
                 email: email || null,
                 bio: bio || null,
+                expertise: expertise.trim() || null,
+                credentials: credentials.trim() || null,
+                beat: beat.trim() || null,
                 title: title || null,
                 avatar_url: avatarUrl || null,
                 social_links: {
@@ -166,7 +173,15 @@ export default function NewAuthorPage() {
                             <p className="text-xs text-gray-500">JPG, PNG up to 5MB</p>
                             {avatarUrl && (
                                 <div className="mt-4">
-                                    <img src={avatarUrl} alt="Avatar preview" className="h-20 w-20 rounded-full" />
+                                    <div className="relative h-20 w-20 overflow-hidden rounded-full">
+                                      <Image
+                                        src={avatarUrl}
+                                        alt="Avatar preview"
+                                        fill
+                                        className="object-cover"
+                                        sizes="80px"
+                                      />
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -229,6 +244,32 @@ export default function NewAuthorPage() {
                             placeholder="Write a brief bio about this author..."
                             className="min-h-[120px]"
                         />
+                        <div className="mt-4 space-y-4">
+                            <div>
+                                <Label>Expertise</Label>
+                                <Input
+                                    value={expertise}
+                                    onChange={(e) => setExpertise(e.target.value)}
+                                    placeholder="e.g. Technology, AI, Startups"
+                                />
+                            </div>
+                            <div>
+                                <Label>Credentials</Label>
+                                <Input
+                                    value={credentials}
+                                    onChange={(e) => setCredentials(e.target.value)}
+                                    placeholder="e.g. 10 years in journalism, MBA from IIM"
+                                />
+                            </div>
+                            <div>
+                                <Label>Beat / Coverage Areas</Label>
+                                <Input
+                                    value={beat}
+                                    onChange={(e) => setBeat(e.target.value)}
+                                    placeholder="e.g. Business, Politics, Sports"
+                                />
+                            </div>
+                        </div>
                     </CardContent>
                 </Card>
 

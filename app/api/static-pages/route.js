@@ -1,6 +1,7 @@
 import { apiResponse } from '@/lib/api-utils'
 import { requireAdmin } from '@/lib/auth-utils'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { revalidatePath } from 'next/cache'
 import {
   STATIC_PAGE_DEFINITIONS,
   STATIC_PAGE_SLUGS,
@@ -8,10 +9,29 @@ import {
   mergeStaticPage,
 } from '@/lib/static-pages'
 
+function revalidateStaticPageSurface(slug) {
+  const publicPathMap = {
+    'about-us': '/about-us',
+    contact: '/contact',
+    'editorial-policy': '/editorial-policy',
+    'corrections-policy': '/corrections-policy',
+    advertise: '/advertise',
+    privacy: '/privacy-policy',
+    terms: '/terms-of-service',
+  }
+
+  const publicPath = publicPathMap[slug]
+  if (publicPath) {
+    revalidatePath(publicPath)
+  }
+
+  revalidatePath('/sitemap.xml')
+}
+
 export async function GET(request) {
   try {
     await requireAdmin()
-    const admin = await createClient()
+    const admin = createAdminClient()
     const { searchParams } = new URL(request.url)
     const slug = searchParams.get('slug')
 
@@ -37,14 +57,15 @@ export async function GET(request) {
       const status = error.message.includes('Admin') ? 403 : 401
       return apiResponse(status, null, error.message)
     }
-    return apiResponse(500, null, error.message || 'Failed to load static pages')
+    console.error(error)
+    return apiResponse(500, null, 'An internal error occurred')
   }
 }
 
 export async function PUT(request) {
   try {
     await requireAdmin()
-    const admin = await createClient()
+    const admin = createAdminClient()
     const payload = await request.json()
     const slug = payload?.slug?.trim()
 
@@ -76,20 +97,22 @@ export async function PUT(request) {
 
     if (error) return apiResponse(400, null, error.message)
 
+    revalidateStaticPageSurface(slug)
     return apiResponse(200, { page: mergeStaticPage(definition, data) })
   } catch (error) {
     if (error.name === 'AuthError') {
       const status = error.message.includes('Admin') ? 403 : 401
       return apiResponse(status, null, error.message)
     }
-    return apiResponse(500, null, error.message || 'Failed to update static page')
+    console.error(error)
+    return apiResponse(500, null, 'An internal error occurred')
   }
 }
 
 export async function DELETE(request) {
   try {
     await requireAdmin()
-    const admin = await createClient()
+    const admin = createAdminClient()
     const payload = await request.json()
     const slug = payload?.slug?.trim()
 
@@ -107,12 +130,14 @@ export async function DELETE(request) {
       .eq('slug', slug)
 
     if (error) return apiResponse(400, null, error.message)
+    revalidateStaticPageSurface(slug)
     return apiResponse(200, { deleted: true })
   } catch (error) {
     if (error.name === 'AuthError') {
       const status = error.message.includes('Admin') ? 403 : 401
       return apiResponse(status, null, error.message)
     }
-    return apiResponse(500, null, error.message || 'Failed to reset static page')
+    console.error(error)
+    return apiResponse(500, null, 'An internal error occurred')
   }
 }

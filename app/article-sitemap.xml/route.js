@@ -1,6 +1,7 @@
 import { createOptionalPublicClient } from '@/lib/supabase/public-server'
 import { getArticleCanonicalUrl } from '@/lib/site-config'
 import { urlsetXml, xmlResponse } from '@/lib/sitemap-utils'
+import { isBlockedCategorySlug } from '@/lib/category-utils'
 
 const MAX_URLS = 50000
 
@@ -17,13 +18,14 @@ export async function GET() {
     .order('published_at', { ascending: false })
     .limit(MAX_URLS)
 
-  const entries = (rows || []).map((article) => ({
-    loc: getArticleCanonicalUrl(article),
-    lastmod: new Date(article.updated_at || article.published_at || Date.now()).toISOString(),
-    changefreq: 'daily',
-    priority: 0.8,
-  }))
+  const entries = (rows || [])
+    .filter((article) => article?.slug && !isBlockedCategorySlug(article.categories?.slug))
+    .map((article) => ({
+      loc: getArticleCanonicalUrl(article),
+      lastmod: new Date(article.updated_at || article.published_at || Date.now()).toISOString(),
+      changefreq: 'daily',
+      priority: 0.8,
+    }))
 
   return xmlResponse(urlsetXml(entries))
 }
-

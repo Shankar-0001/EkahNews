@@ -35,7 +35,8 @@ export async function GET(_request, { params }) {
     const metrics = await getCurrentMetrics(supabase, articleId)
     return apiResponse(200, { metrics }, null)
   } catch (error) {
-    return apiResponse(500, null, error.message || 'Failed to load engagement')
+    console.error(error)
+    return apiResponse(500, null, 'An internal error occurred')
   }
 }
 
@@ -116,6 +117,7 @@ export async function POST(request, { params }) {
 
     return apiResponse(200, { metrics: next }, null)
   } catch (error) {
-    return apiResponse(500, null, error.message || 'Failed to update engagement')
+    console.error(error)
+    return apiResponse(500, null, 'An internal error occurred')
   }
 }

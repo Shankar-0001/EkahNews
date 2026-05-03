@@ -13,6 +13,13 @@ import { useToast } from '@/hooks/use-toast'
 import { createSlug } from '@/lib/slug'
 import { validateImageFile } from '@/lib/image-utils'
 
+function normalizeExternalUrl(url) {
+  const value = url?.trim()
+  if (!value) return ''
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(value)) return value
+  return `https://${value}`
+}
+
 export default function AuthorSettingsPage() {
   const router = useRouter()
   const supabase = createClient()
@@ -25,6 +32,14 @@ export default function AuthorSettingsPage() {
   const [email, setEmail] = useState('')
   const [bio, setBio] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
+  const [socialLinks, setSocialLinks] = useState({
+    twitter: '',
+    linkedin: '',
+    website: '',
+    expertise: '',
+    credentials: '',
+    beat: '',
+  })
 
   useEffect(() => {
     loadAuthorProfile()
@@ -40,7 +55,7 @@ export default function AuthorSettingsPage() {
 
       const { data: author } = await supabase
         .from('authors')
-        .select('id, name, slug, email, bio, avatar_url')
+        .select('id, name, slug, email, bio, avatar_url, social_links')
         .eq('user_id', user.id)
         .maybeSingle()
 
@@ -51,11 +66,27 @@ export default function AuthorSettingsPage() {
         setEmail(author.email || user.email || '')
         setBio(author.bio || '')
         setAvatarUrl(author.avatar_url || '')
+        setSocialLinks({
+          twitter: author.social_links?.twitter || '',
+          linkedin: author.social_links?.linkedin || '',
+          website: author.social_links?.website || '',
+          expertise: author.social_links?.expertise || '',
+          credentials: author.social_links?.credentials || '',
+          beat: author.social_links?.beat || '',
+        })
       } else {
         setName(user.email?.split('@')[0] || '')
         setEmail(user.email || '')
         setBio('')
         setAvatarUrl('')
+        setSocialLinks({
+          twitter: '',
+          linkedin: '',
+          website: '',
+          expertise: '',
+          credentials: '',
+          beat: '',
+        })
       }
     } catch (error) {
       console.error('Failed to load author profile:', error)
@@ -112,6 +143,14 @@ export default function AuthorSettingsPage() {
         email: email.trim() || null,
         bio: bio.trim() || null,
         avatar_url: avatarUrl || null,
+        social_links: {
+          twitter: normalizeExternalUrl(socialLinks.twitter),
+          linkedin: normalizeExternalUrl(socialLinks.linkedin),
+          website: normalizeExternalUrl(socialLinks.website),
+          expertise: socialLinks.expertise.trim(),
+          credentials: socialLinks.credentials.trim(),
+          beat: socialLinks.beat.trim(),
+        },
       }
 
       const response = await fetch('/api/authors', {
@@ -203,6 +242,57 @@ export default function AuthorSettingsPage() {
               className="min-h-[140px]"
             />
           </div>
+          <div>
+            <Label>LinkedIn URL</Label>
+            <Input
+              type="url"
+              value={socialLinks.linkedin}
+              onChange={(e) => setSocialLinks({ ...socialLinks, linkedin: e.target.value })}
+              placeholder="https://linkedin.com/in/username"
+            />
+          </div>
+          <div>
+            <Label>Twitter/X URL</Label>
+            <Input
+              type="url"
+              value={socialLinks.twitter}
+              onChange={(e) => setSocialLinks({ ...socialLinks, twitter: e.target.value })}
+              placeholder="https://twitter.com/username"
+            />
+          </div>
+          <div>
+            <Label>Website URL</Label>
+            <Input
+              type="url"
+              value={socialLinks.website}
+              onChange={(e) => setSocialLinks({ ...socialLinks, website: e.target.value })}
+              placeholder="https://example.com"
+            />
+          </div>
+          <div>
+            <Label>Expertise / Beat</Label>
+            <Input
+              value={socialLinks.expertise}
+              onChange={(e) => setSocialLinks({ ...socialLinks, expertise: e.target.value })}
+              placeholder="Technology, Science"
+            />
+          </div>
+          <div>
+            <Label>Credentials</Label>
+            <Input
+              value={socialLinks.credentials}
+              onChange={(e) => setSocialLinks({ ...socialLinks, credentials: e.target.value })}
+              placeholder="MSc Computer Science, IIT Hyderabad"
+            />
+          </div>
+          <div>
+            <Label>Beat</Label>
+            <Input
+              value={socialLinks.beat}
+              onChange={(e) => setSocialLinks({ ...socialLinks, beat: e.target.value })}
+              placeholder="AI, Startups, Policy"
+            />
+          </div>
           <div className="flex gap-3">
             <Button onClick={handleSave} disabled={saving}>
               {saving ? 'Saving...' : 'Save Profile'}
@@ -213,4 +303,3 @@ export default function AuthorSettingsPage() {
     </div>
   )
 }
-

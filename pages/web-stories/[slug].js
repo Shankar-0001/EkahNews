@@ -197,6 +197,18 @@ function buildAmpStoryAdsConfig() {
   return null
 }
 
+function isValidWhatsappUrl(url) {
+  return typeof url === 'string'
+    && /^https:\/\/chat\.whatsapp\.com\//i.test(url.trim())
+}
+
+function getResolvedStoryHref(value, fallback = '') {
+  if (!value || typeof value !== 'string') return fallback
+  const normalized = value.trim()
+  if (!normalized || normalized === '/web-stories') return fallback
+  return normalized
+}
+
 export async function getServerSideProps({ params, req, res }) {
   try {
     const supabase = getSupabase()
@@ -208,7 +220,7 @@ export async function getServerSideProps({ params, req, res }) {
       .maybeSingle()
 
     const slides = getSlides(story)
-    if (!story || slides.length < 4) {
+    if (!story || slides.length < 1) {
       return { notFound: true }
     }
 
@@ -237,27 +249,51 @@ export default function WebStoryAmpPage({ story, gaMeasurementId }) {
   const logoUrl = getPublicationLogoUrl()
   const articleUrl = story.related_article_slug
     ? absoluteUrl(`/${story.categories?.slug || 'news'}/${story.related_article_slug}`)
-    : ''
+    : absoluteUrl(`/web-stories/${story.slug}`)
   const schemas = buildSchemas(story, slides, canonical)
   const analyticsConfig = gaMeasurementId ? buildAmpAnalyticsConfig(gaMeasurementId) : null
   const ampStoryAdsConfig = buildAmpStoryAdsConfig()
   const canShowStoryAds = Boolean(ampStoryAdsConfig && (slides.length + 1) >= 7)
   const defaultOutlinkLabel = `Read full story: ${story.title}`
+  const storyJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: story.title,
+    description,
+    url: canonical,
+    image: story.cover_image || 'https://www.ekahnews.com/og-default.jpg',
+    datePublished: story.published_at || story.updated_at,
+    dateModified: story.updated_at || story.published_at,
+    author: {
+      '@type': 'Person',
+      name: story.authors?.name || 'EkahNews',
+      url: `https://www.ekahnews.com/authors/${story.authors?.slug || ''}`,
+    },
+    publisher: {
+      '@type': 'Organization',
+      name: 'EkahNews',
+      url: 'https://www.ekahnews.com',
+      logo: {
+        '@type': 'ImageObject',
+        url: 'https://www.ekahnews.com/logo.png',
+      },
+    },
+  }
 
   return (
     <>
       <Head>
-        <title>{story.seo_title || story.title}</title>
+        <title>{story.title} | EkahNews</title>
         <meta name="description" content={description} />
-        <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" />
+        <meta name="robots" content="index, follow, max-image-preview:large" />
         <meta property="og:type" content="article" />
-        <meta property="og:title" content={story.seo_title || story.title} />
+        <meta property="og:title" content={story.title} />
         <meta property="og:description" content={description} />
         <meta property="og:url" content={canonical} />
         {story.cover_image ? <meta property="og:image" content={story.cover_image} /> : null}
         {story.cover_image_alt ? <meta property="og:image:alt" content={story.cover_image_alt} /> : null}
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content={story.seo_title || story.title} />
+        <meta name="twitter:title" content={story.title} />
         <meta name="twitter:description" content={description} />
         {story.cover_image ? <meta name="twitter:image" content={story.cover_image} /> : null}
         {story.cover_image_alt ? <meta name="twitter:image:alt" content={story.cover_image_alt} /> : null}
@@ -265,6 +301,7 @@ export default function WebStoryAmpPage({ story, gaMeasurementId }) {
 
         <script key="schema-primary" type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schemas.primary) }} />
         <script key="schema-breadcrumb" type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schemas.breadcrumb) }} />
+        <script key="schema-article" type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(storyJsonLd) }} />
       </Head>
 
       <style jsx global>{AMP_CUSTOM_CSS}</style>
@@ -301,13 +338,25 @@ export default function WebStoryAmpPage({ story, gaMeasurementId }) {
         </amp-story-page>
 
         {slides.map((slide, index) => {
-          const isCtaSlide = Boolean(slide?.cta_url || slide?.cta_text || slide?.whatsapp_group_url)
+          const whatsappHref = isValidWhatsappUrl(slide?.whatsapp_group_url)
+            ? slide.whatsapp_group_url.trim()
+            : ''
+          const directCtaHref = getResolvedStoryHref(slide?.cta_url, '')
+          const ctaHref = whatsappHref || directCtaHref || (
+            slide?.cta_text
+              ? articleUrl
+              : ''
+          )
+          const isCtaSlide = Boolean(
+            whatsappHref
+            || directCtaHref
+            || slide?.cta_text
+          )
           const isVideoSlide = slide?.media_type === 'video' && slide?.video
           const pageId = `page-${index + 2}`
           const mediaId = `media-${index + 2}`
-          const ctaHref = slide?.whatsapp_group_url || slide?.cta_url || articleUrl || ''
-          const ctaText = slide?.whatsapp_group_url ? 'Join WhatsApp Community' : (slide?.cta_text || 'Read Full Story')
-          const outlinkLabel = slide?.whatsapp_group_url
+          const ctaText = whatsappHref ? 'Join WhatsApp Community' : (slide?.cta_text || 'Read Full Story')
+          const outlinkLabel = whatsappHref
             ? `Join WhatsApp community for ${story.title}`
             : (slide?.cta_text ? `${slide.cta_text}: ${story.title}` : defaultOutlinkLabel)
 
@@ -341,7 +390,7 @@ export default function WebStoryAmpPage({ story, gaMeasurementId }) {
                 ) : (
                   <div className="cta-shell">
                     {ctaHref ? (
-                      <p className={`cta-hint${slide?.whatsapp_group_url ? ' whatsapp' : ''}`}>{ctaText}</p>
+                      <p className={`cta-hint${whatsappHref ? ' whatsapp' : ''}`}>{ctaText}</p>
                     ) : null}
                   </div>
                 )}
@@ -365,5 +414,3 @@ export default function WebStoryAmpPage({ story, gaMeasurementId }) {
     </>
   )
 }
-
-

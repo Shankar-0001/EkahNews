@@ -29,6 +29,18 @@ function getSlideDuration(slide) {
   return AUTO_MS
 }
 
+function isValidWhatsappUrl(url) {
+  return typeof url === 'string'
+    && /^https:\/\/chat\.whatsapp\.com\//i.test(url.trim())
+}
+
+function getResolvedStoryHref(value, fallback = '') {
+  if (!value || typeof value !== 'string') return fallback
+  const normalized = value.trim()
+  if (!normalized || normalized === '/web-stories') return fallback
+  return normalized
+}
+
 export default function WebStoryViewer({ story, articleUrl }) {
   const slides = useMemo(() => {
     const storySlides = Array.isArray(story?.slides) ? story.slides.filter((slide) => slide?.image || slide?.video) : []
@@ -48,13 +60,19 @@ export default function WebStoryViewer({ story, articleUrl }) {
   const storyTime = formatStoryTime(story?.published_at || story?.updated_at)
   const current = slides[index] || {}
   const isCoverSlide = Boolean(current?.isCover)
-  const isWhatsappSlide = Boolean(current?.whatsapp_group_url)
-  const isReadMoreSlide = !isCoverSlide && !isWhatsappSlide && Boolean(current?.cta_text || current?.cta_url)
+  const whatsappHref = isValidWhatsappUrl(current?.whatsapp_group_url) ? current.whatsapp_group_url.trim() : ''
+  const directCtaHref = getResolvedStoryHref(current?.cta_url, '')
+  const ctaHref = whatsappHref || directCtaHref || (
+    current?.cta_text
+      ? (articleUrl || `/web-stories/${story?.slug || ''}`)
+      : ''
+  )
+  const isWhatsappSlide = Boolean(whatsappHref)
+  const isReadMoreSlide = !isCoverSlide && !isWhatsappSlide && Boolean(current?.cta_text || directCtaHref)
   const isVideoSlide = !isCoverSlide && current?.media_type === 'video' && current?.video
   const progressWidth = `${((index + 1) / Math.max(1, slides.length)) * 100}%`
-  const ctaHref = current?.cta_url || articleUrl || '#'
   const ctaLinkProps = getAnchorPropsForHref(ctaHref)
-  const whatsappLinkProps = getAnchorPropsForHref(current?.whatsapp_group_url || '')
+  const whatsappLinkProps = getAnchorPropsForHref(whatsappHref)
 
   useEffect(() => {
     if (!story?.id) return
@@ -163,9 +181,9 @@ export default function WebStoryViewer({ story, articleUrl }) {
 
           {isWhatsappSlide && (
             <div className="mt-3 text-center">
-              {current.whatsapp_group_url ? (
+              {whatsappHref ? (
                 <a
-                  href={current.whatsapp_group_url}
+                  href={whatsappHref}
                   {...whatsappLinkProps}
                   className="inline-flex rounded-full bg-green-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-green-400"
                 >

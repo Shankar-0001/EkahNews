@@ -4,7 +4,6 @@ import Script from 'next/script'
 import { usePathname } from 'next/navigation'
 
 const PLACEHOLDER_CLIENT_IDS = new Set(['ca-pub-0000000000000000', 'ca-pub-1234567890123456'])
-const DEFAULT_GA_MEASUREMENT_ID = 'G-8HXXQFFZCH'
 
 function isAmpStoryPath(pathname = '') {
   return pathname.startsWith('/web-stories/') && pathname !== '/web-stories'
@@ -23,7 +22,7 @@ export default function OptionalGlobalScripts() {
   const adsenseScriptSrc = hasValidAdsenseClientId
     ? `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsenseClientId}`
     : null
-  const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || DEFAULT_GA_MEASUREMENT_ID
+  const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID
   const shouldLoadAnalytics = Boolean(gaMeasurementId)
 
   return (

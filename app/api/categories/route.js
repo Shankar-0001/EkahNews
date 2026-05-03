@@ -50,7 +50,8 @@ export async function GET(request) {
       const status = error.message.includes('Admin') ? 403 : 401
       return apiResponse(status, null, error.message)
     }
-    return apiResponse(500, null, error.message || 'Failed to load categories')
+    console.error('Categories GET error:', error)
+    return apiResponse(500, null, 'An internal error occurred')
   }
 }
 
@@ -78,7 +79,8 @@ export async function POST(request) {
       const status = error.message.includes('Admin') ? 403 : 401
       return apiResponse(status, null, error.message)
     }
-    return apiResponse(500, null, error.message || 'Failed to create category')
+    console.error('Categories POST error:', error)
+    return apiResponse(500, null, 'An internal error occurred')
   }
 }
 
@@ -118,7 +120,8 @@ export async function PATCH(request) {
       const status = error.message.includes('Admin') ? 403 : 401
       return apiResponse(status, null, error.message)
     }
-    return apiResponse(500, null, error.message || 'Failed to update category')
+    console.error('Categories PATCH error:', error)
+    return apiResponse(500, null, 'An internal error occurred')
   }
 }
 
@@ -148,6 +151,7 @@ export async function DELETE(request) {
       const status = error.message.includes('Admin') ? 403 : 401
       return apiResponse(status, null, error.message)
     }
-    return apiResponse(500, null, error.message || 'Failed to delete category')
+    console.error('Categories DELETE error:', error)
+    return apiResponse(500, null, 'An internal error occurred')
   }
 }

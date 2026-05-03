@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { apiResponse } from '@/lib/api-utils'
 import { requireRequestAuth } from '@/lib/auth-utils'
 import { validateTag } from '@/lib/validation'
+import { slugFromText } from '@/lib/site-config'
 
 // POST - Create article tag relationships
 export async function POST(request) {
@@ -77,7 +78,7 @@ export async function POST(request) {
         return apiResponse(201, { relations: data }, null)
     } catch (error) {
         console.error('[API] Error creating article tags:', error)
-        return apiResponse(500, null, error.message)
+        return apiResponse(500, null, 'An internal error occurred')
     }
 }
 
@@ -135,7 +136,7 @@ export async function DELETE(request) {
         return apiResponse(200, { deleted: true }, null)
     } catch (error) {
         console.error('[API] Error deleting article tags:', error)
-        return apiResponse(500, null, error.message)
+        return apiResponse(500, null, 'An internal error occurred')
     }
 }
 
@@ -146,15 +147,17 @@ export async function PUT(request) {
         const admin = createAdminClient()
 
         const { name, slug } = await request.json()
-        validateTag({ name, slug })
-        if (!name || !slug) {
-            return apiResponse(400, null, 'Name and slug are required')
+        const normalizedName = name?.trim() || ''
+        const normalizedSlug = slugFromText(slug || normalizedName)
+        validateTag({ name: normalizedName, slug: normalizedSlug })
+        if (!normalizedName || !normalizedSlug) {
+            return apiResponse(400, null, 'Name is required')
         }
 
         const { data: existing } = await admin
             .from('tags')
             .select('id, name, slug')
-            .eq('slug', slug)
+            .eq('slug', normalizedSlug)
             .maybeSingle()
 
         if (existing) {
@@ -163,7 +166,7 @@ export async function PUT(request) {
 
         const { data: tag, error } = await admin
             .from('tags')
-            .insert({ name, slug })
+            .insert({ name: normalizedName, slug: normalizedSlug })
             .select('id, name, slug')
             .single()
 
@@ -180,7 +183,6 @@ export async function PUT(request) {
             return apiResponse(401, null, error.message)
         }
         console.error('[API] Error creating tag:', error)
-        return apiResponse(500, null, error.message)
+        return apiResponse(500, null, 'An internal error occurred')
     }
 }
-

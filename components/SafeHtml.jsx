@@ -1,45 +1,13 @@
-'use client'
-
-import { useEffect, useMemo, useState } from 'react'
-import createDOMPurify from 'dompurify'
+import { sanitizeStoredHtml } from '@/lib/html-sanitizer'
 import { applyLinkPolicyToHtml } from '@/lib/link-policy'
 
-function stripHtmlToText(html = '') {
-  return String(html)
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
+export default function SafeHtml({ html = '', className = '', baseUrl }) {
+  if (!html) return null
 
-function sanitizeClientHtml(html = '', baseUrl) {
-  if (typeof window === 'undefined') return ''
-
-  const cleaned = createDOMPurify(window).sanitize(html || '', {
-    USE_PROFILES: { html: true },
-    FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'form'],
-    FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'style'],
-    ALLOW_DATA_ATTR: false,
-  })
-
-  return applyLinkPolicyToHtml(cleaned, {
+  const sanitizedHtml = applyLinkPolicyToHtml(sanitizeStoredHtml(html), {
     baseUrl,
     nofollowExternal: true,
   })
-}
 
-export default function SafeHtml({ html = '', className = '', baseUrl }) {
-  const serverSafeHtml = useMemo(() => {
-    const text = stripHtmlToText(html)
-    return text ? `<p>${text}</p>` : ''
-  }, [html])
-
-  const [sanitizedHtml, setSanitizedHtml] = useState(serverSafeHtml)
-
-  useEffect(() => {
-    setSanitizedHtml(sanitizeClientHtml(html, baseUrl) || serverSafeHtml)
-  }, [baseUrl, html, serverSafeHtml])
-
-  return <div className={className} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: sanitizedHtml }} />
+  return <div className={className} dangerouslySetInnerHTML={{ __html: sanitizedHtml }} />
 }

@@ -1,9 +1,15 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowRight, Facebook, Instagram, Youtube, Linkedin, Mail, Sparkles } from 'lucide-react'
+import { ArrowRight, Facebook, Instagram, Linkedin, Mail, Sparkles, Youtube } from 'lucide-react'
 import { usePathname } from 'next/navigation'
-import { getPublicationSocialProfiles } from '@/lib/site-config'
+
+function normalizeSocialUrl(url = '') {
+  const value = String(url || '').trim()
+  if (!value) return ''
+  if (/^https?:\/\//i.test(value)) return value
+  return `https://${value.replace(/^\/+/, '')}`
+}
 
 export default function SiteFooter() {
   const pathname = usePathname() || ''
@@ -14,13 +20,13 @@ export default function SiteFooter() {
   }
 
   const socialLinks = {
-    facebook: process.env.NEXT_PUBLIC_FACEBOOK_URL,
-    twitter: process.env.NEXT_PUBLIC_TWITTER_URL,
-    instagram: process.env.NEXT_PUBLIC_INSTAGRAM_URL,
-    youtube: process.env.NEXT_PUBLIC_YOUTUBE_URL,
-    linkedin: process.env.NEXT_PUBLIC_LINKEDIN_URL,
+    instagram: normalizeSocialUrl(process.env.NEXT_PUBLIC_INSTAGRAM_URL),
+    linkedin: normalizeSocialUrl(process.env.NEXT_PUBLIC_LINKEDIN_URL),
+    twitter: normalizeSocialUrl(process.env.NEXT_PUBLIC_TWITTER_URL),
+    facebook: normalizeSocialUrl(process.env.NEXT_PUBLIC_FACEBOOK_URL),
+    youtube: normalizeSocialUrl(process.env.NEXT_PUBLIC_YOUTUBE_URL),
   }
-  const hasSocialLinks = getPublicationSocialProfiles().length > 0
+  const hasSocialLinks = Object.values(socialLinks).some(Boolean)
 
   return (
     <footer className="mt-16 border-t border-slate-200 bg-[linear-gradient(180deg,_#0f172a_0%,_#020617_100%)] text-white dark:bg-black">
@@ -36,9 +42,6 @@ export default function SiteFooter() {
                   <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Modern Newsroom</p>
                 </div>
               </div>
-              <p className="max-w-2xl text-slate-300 leading-7">
-                Trusted reporting, explainers, trending topics, and web stories presented with a cleaner digital-first newsroom experience.
-              </p>
             </div>
 
             <div className="border border-white/10 bg-slate-950/60 p-5">
@@ -70,14 +73,7 @@ export default function SiteFooter() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-          <div>
-            <h4 className="font-semibold mb-3 text-white">About</h4>
-            <p className="text-slate-400 text-sm leading-6">
-              EkahNews focuses on readable, credible, and fast-moving coverage across major categories.
-            </p>
-          </div>
-
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div>
             <h4 className="font-semibold mb-3">Company</h4>
             <ul className="space-y-2 text-slate-400">
@@ -102,9 +98,14 @@ export default function SiteFooter() {
             <h4 className="font-semibold mb-3">Follow Us</h4>
             {hasSocialLinks ? (
               <div className="flex items-center gap-3">
-              {socialLinks.facebook && (
-              <Link href={socialLinks.facebook} aria-label="Facebook" className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#1877F2] text-white shadow-sm transition-opacity hover:opacity-90">
-                <Facebook className="h-5 w-5" />
+              {socialLinks.instagram && (
+              <Link href={socialLinks.instagram} aria-label="Instagram" className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-tr from-[#f58529] via-[#dd2a7b] to-[#515bd4] text-white shadow-sm transition-opacity hover:opacity-90">
+                <Instagram className="h-5 w-5" />
+              </Link>
+              )}
+              {socialLinks.linkedin && (
+              <Link href={socialLinks.linkedin} aria-label="LinkedIn" className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#0A66C2] text-white shadow-sm transition-opacity hover:opacity-90">
+                <Linkedin className="h-5 w-5" />
               </Link>
               )}
               {socialLinks.twitter && (
@@ -117,19 +118,14 @@ export default function SiteFooter() {
                 </svg>
               </Link>
               )}
-              {socialLinks.instagram && (
-              <Link href={socialLinks.instagram} aria-label="Instagram" className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-tr from-[#f58529] via-[#dd2a7b] to-[#515bd4] text-white shadow-sm transition-opacity hover:opacity-90">
-                <Instagram className="h-5 w-5" />
+              {socialLinks.facebook && (
+              <Link href={socialLinks.facebook} aria-label="Facebook" className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#1877F2] text-white shadow-sm transition-opacity hover:opacity-90">
+                <Facebook className="h-5 w-5" />
               </Link>
               )}
               {socialLinks.youtube && (
               <Link href={socialLinks.youtube} aria-label="YouTube" className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#FF0000] text-white shadow-sm transition-opacity hover:opacity-90">
                 <Youtube className="h-5 w-5" />
-              </Link>
-              )}
-              {socialLinks.linkedin && (
-              <Link href={socialLinks.linkedin} aria-label="LinkedIn" className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#0A66C2] text-white shadow-sm transition-opacity hover:opacity-90">
-                <Linkedin className="h-5 w-5" />
               </Link>
               )}
               </div>

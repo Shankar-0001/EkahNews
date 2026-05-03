@@ -1,15 +1,30 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { Clock3, User } from 'lucide-react'
-import { format, formatDistanceToNow } from 'date-fns'
+import { format } from 'date-fns'
 import { createOptionalPublicClient } from '@/lib/supabase/public-server'
 import PublicHeader from '@/components/layout/PublicHeader'
+import { formatArticleCardDate } from '@/lib/date-utils'
 
 export const revalidate = 600
 
 export const metadata = {
   title: 'Latest News - EkahNews',
   description: 'Today\'s latest published news on EkahNews.',
+  alternates: {
+    canonical: 'https://www.ekahnews.com/latest-news',
+  },
+  openGraph: {
+    title: 'Latest News - EkahNews',
+    description: 'Today\'s latest published news on EkahNews.',
+    url: 'https://www.ekahnews.com/latest-news',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Latest News - EkahNews',
+    description: 'Today\'s latest published news on EkahNews.',
+  },
 }
 
 function getArticleHref(article) {
@@ -121,7 +136,7 @@ export default async function LatestNewsPage() {
                     {article.published_at && (
                       <span className="inline-flex items-center gap-1.5">
                         <Clock3 className="h-3.5 w-3.5" />
-                        {formatDistanceToNow(new Date(article.published_at), { addSuffix: true })}
+                        {formatArticleCardDate(article.published_at)}
                       </span>
                     )}
                   </div>

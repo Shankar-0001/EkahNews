@@ -67,10 +67,10 @@ export async function GET(request) {
       fetched_at: now,
     }, null)
   } catch (error) {
-    return apiResponse(500, null, error.message || 'Failed to fetch trends')
+    console.error(error)
+    return apiResponse(500, null, 'An internal error occurred')
   }
 }
-
 
 
 

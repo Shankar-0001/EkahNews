@@ -1,18 +1,18 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { Card } from '@/components/ui/card'
-import { formatDistanceToNow } from 'date-fns'
 import { Clock3 } from 'lucide-react'
+import { formatArticleCardDate } from '@/lib/date-utils'
 
 export default function ArticleMiniCard({ article, compact = false, hideAuthor = false, hideExcerpt = false, imagePriority = false, squareImage = false }) {
   const href = `/${article.categories?.slug || 'news'}/${article.slug}`
   const authorName = article.authors?.name
   const imageAspectClass = squareImage ? 'aspect-square' : compact ? 'aspect-[4/3]' : 'aspect-[16/10]'
   const imageSizes = squareImage
-    ? '(max-width: 768px) 100vw, 25vw'
+    ? '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw'
     : compact
-      ? '(max-width: 768px) 100vw, 33vw'
-      : '(max-width: 1024px) 100vw, 25vw'
+      ? '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw'
+      : '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw'
 
   return (
     <Link href={href} className="block h-full">
@@ -47,7 +47,7 @@ export default function ArticleMiniCard({ article, compact = false, hideAuthor =
             {article.published_at && (
               <span className="inline-flex items-center gap-1.5">
                 <Clock3 className="h-3.5 w-3.5" />
-                {formatDistanceToNow(new Date(article.published_at), { addSuffix: true })}
+                {formatArticleCardDate(article.published_at)}
               </span>
             )}
           </div>

@@ -2,6 +2,8 @@ import { revalidatePath } from 'next/cache'
 import { apiResponse } from '@/lib/api-utils'
 import { requireAdmin } from '@/lib/auth-utils'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { slugFromText } from '@/lib/site-config'
+import { validateTag, ValidationError } from '@/lib/validation'
 
 function getPaging(url) {
   const search = new URL(url).searchParams
@@ -47,7 +49,8 @@ export async function GET(request) {
       const status = error.message.includes('Admin') ? 403 : 401
       return apiResponse(status, null, error.message)
     }
-    return apiResponse(500, null, error.message || 'Failed to load tags')
+    console.error(error)
+    return apiResponse(500, null, 'An internal error occurred')
   }
 }
 
@@ -56,14 +59,21 @@ export async function POST(request) {
     await requireAdmin()
     const admin = createAdminClient()
     const { name, slug } = await request.json()
+    const normalizedName = name?.trim() || ''
+    const normalizedSlug = slugFromText(slug || normalizedName)
 
-    if (!name || !slug) {
-      return apiResponse(400, null, 'Name and slug are required')
+    validateTag({
+      name: normalizedName,
+      slug: normalizedSlug,
+    })
+
+    if (!normalizedName || !normalizedSlug) {
+      return apiResponse(400, null, 'Name is required')
     }
 
     const { data, error } = await admin
       .from('tags')
-      .insert({ name, slug })
+      .insert({ name: normalizedName, slug: normalizedSlug })
       .select('id, name, slug, created_at, updated_at')
       .single()
 
@@ -71,11 +81,15 @@ export async function POST(request) {
     revalidateTagSurface(data.slug)
     return apiResponse(201, { tag: data })
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return apiResponse(422, null, error.fields?.slug || error.fields?.name || error.message)
+    }
     if (error.name === 'AuthError') {
       const status = error.message.includes('Admin') ? 403 : 401
       return apiResponse(status, null, error.message)
     }
-    return apiResponse(500, null, error.message || 'Failed to create tag')
+    console.error(error)
+    return apiResponse(500, null, 'An internal error occurred')
   }
 }
 
@@ -105,6 +119,7 @@ export async function DELETE(request) {
       const status = error.message.includes('Admin') ? 403 : 401
       return apiResponse(status, null, error.message)
     }
-    return apiResponse(500, null, error.message || 'Failed to delete tag')
+    console.error(error)
+    return apiResponse(500, null, 'An internal error occurred')
   }
 }

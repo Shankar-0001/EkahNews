@@ -3,7 +3,7 @@ import { notFound, permanentRedirect } from 'next/navigation'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
-import { Calendar, Linkedin } from 'lucide-react'
+import { Calendar, Globe, Linkedin, Twitter } from 'lucide-react'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import Image from 'next/image'
@@ -11,6 +11,9 @@ import PublicHeader from '@/components/layout/PublicHeader'
 import StructuredData from '@/components/seo/StructuredData'
 import { absoluteUrl } from '@/lib/site-config'
 import { getAnchorPropsForHref } from '@/lib/link-policy'
+import SchemaScript from '@/components/seo/SchemaScript'
+import { getPersonSchema } from '@/lib/schema'
+import { filterBlockedCategories } from '@/lib/category-utils'
 
 async function findAuthorBySlug(rawSlug) {
   const supabase = await createClient()
@@ -82,7 +85,13 @@ export async function generateMetadata({ params }) {
   return {
     title: `${author.name} | EkahNews`,
     description,
-    alternates: { canonical },
+    alternates: {
+      canonical,
+      languages: {
+        en: canonical,
+        'x-default': canonical,
+      },
+    },
     robots: {
       index: publishedCount > 0,
       follow: true,
@@ -161,6 +170,14 @@ export default async function AuthorProfilePage({ params }) {
 
   const categories = categoriesResult.data
   const authorCanonicalUrl = absoluteUrl(`/authors/${canonicalSlug}`)
+  const filteredCategories = filterBlockedCategories(categories || [])
+  const articleCount = articles.length
+  const expertise = author.social_links?.expertise?.trim() || ''
+  const credentials = author.social_links?.credentials?.trim() || ''
+  const beat = author.social_links?.beat?.trim() || ''
+  const knowsAbout = [expertise, beat]
+    .filter(Boolean)
+    .flatMap((value) => value.split(',').map((item) => item.trim()).filter(Boolean))
   const profileSchema = {
     '@context': 'https://schema.org',
     '@type': 'ProfilePage',
@@ -173,6 +190,15 @@ export default async function AuthorProfilePage({ params }) {
       image: author.avatar_url || undefined,
       jobTitle: author.title || undefined,
       url: authorCanonicalUrl,
+      knowsAbout: knowsAbout.length > 0 ? knowsAbout : undefined,
+      hasCredential: credentials
+        ? {
+            '@type': 'EducationalOccupationalCredential',
+            credentialCategory: 'Professional credentials',
+            name: credentials,
+          }
+        : undefined,
+      numberOfItems: articleCount || undefined,
       sameAs: [
         author.social_links?.twitter,
         author.social_links?.linkedin,
@@ -184,7 +210,21 @@ export default async function AuthorProfilePage({ params }) {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <StructuredData data={profileSchema} />
-      <PublicHeader categories={categories || []} />
+      <SchemaScript schema={getPersonSchema({
+        name: author.name,
+        slug: canonicalSlug,
+        bio: author.bio || '',
+        jobTitle: author.title || 'Journalist',
+        sameAs: [
+          author.social_links?.twitter,
+          author.social_links?.linkedin,
+          author.social_links?.website,
+        ].filter(Boolean),
+        knowsAbout,
+        credentials,
+        numberOfItems: articleCount,
+      })} />
+      <PublicHeader categories={filteredCategories} />
       <div className="w-full max-w-6xl mx-auto px-4 py-12">
         <Card className="mb-8 dark:bg-gray-800 dark:border-gray-700">
           <CardHeader className="text-center py-12">
@@ -204,17 +244,53 @@ export default async function AuthorProfilePage({ params }) {
                   {author.bio}
                 </p>
               )}
-              {author.social_links?.linkedin && (
+              {articleCount > 0 && (
+                <Badge variant="secondary" className="mb-4">
+                  {articleCount} article{articleCount !== 1 ? 's' : ''} published
+                </Badge>
+              )}
+              {(expertise || credentials || beat) && (
+                <div className="mb-4 max-w-2xl space-y-2 text-center text-sm text-gray-600 dark:text-gray-400">
+                  {expertise && <p><span className="font-semibold text-gray-800 dark:text-gray-200">Expertise:</span> {expertise}</p>}
+                  {credentials && <p><span className="font-semibold text-gray-800 dark:text-gray-200">Credentials:</span> {credentials}</p>}
+                  {beat && <p><span className="font-semibold text-gray-800 dark:text-gray-200">Beat / Coverage Areas:</span> {beat}</p>}
+                </div>
+              )}
+              {(author.social_links?.linkedin || author.social_links?.twitter || author.social_links?.website) && (
                 <div className="flex gap-4 mt-4">
-                  <a
-                    href={author.social_links.linkedin}
-                    {...getAnchorPropsForHref(author.social_links.linkedin)}
-                    className="inline-flex items-center gap-2 rounded-full bg-[#0A66C2] px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
-                    aria-label={`${author.name} LinkedIn profile`}
-                  >
-                    <Linkedin className="h-4 w-4" />
-                    LinkedIn
-                  </a>
+                  {author.social_links?.linkedin && (
+                    <a
+                      href={author.social_links.linkedin}
+                      {...getAnchorPropsForHref(author.social_links.linkedin)}
+                      className="inline-flex items-center gap-2 rounded-full bg-[#0A66C2] px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+                      aria-label={`${author.name} LinkedIn profile`}
+                    >
+                      <Linkedin className="h-4 w-4" />
+                      LinkedIn
+                    </a>
+                  )}
+                  {author.social_links?.twitter && (
+                    <a
+                      href={author.social_links.twitter}
+                      {...getAnchorPropsForHref(author.social_links.twitter)}
+                      className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+                      aria-label={`${author.name} Twitter profile`}
+                    >
+                      <Twitter className="h-4 w-4" />
+                      X / Twitter
+                    </a>
+                  )}
+                  {author.social_links?.website && (
+                    <a
+                      href={author.social_links.website}
+                      {...getAnchorPropsForHref(author.social_links.website)}
+                      className="inline-flex items-center gap-2 rounded-full bg-slate-700 px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+                      aria-label={`${author.name} website`}
+                    >
+                      <Globe className="h-4 w-4" />
+                      Website
+                    </a>
+                  )}
                 </div>
               )}
             </div>

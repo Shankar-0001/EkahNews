@@ -1,5 +1,5 @@
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { apiResponse } from '@/lib/api-utils'
 import { requireAuth, getUserAuthorId } from '@/lib/auth-utils'
 import { resolveCanonicalUrl, slugFromText } from '@/lib/site-config'
@@ -43,6 +43,7 @@ function deriveStoryCtas(slides = []) {
 }
 
 function revalidateStorySurface(story) {
+  revalidatePath('/tags')
   revalidatePath('/web-stories')
   revalidatePath('/web-stories-sitemap.xml')
   revalidatePath('/sitemap.xml')
@@ -51,7 +52,7 @@ function revalidateStorySurface(story) {
   }
 }
 
-const STORY_SELECT = 'id, title, slug, cover_image, cover_image_alt, slides, author_id, category_id, tags, keywords, related_article_slug, cta_text, cta_url, whatsapp_group_url, ad_slot, seo_title, seo_description, canonical_url, structured_data, status, published_at, created_at, updated_at, authors(name, slug), categories(name, slug)'
+const STORY_SELECT = 'id, title, slug, cover_image, cover_image_alt, slides, author_id, category_id, keywords, related_article_slug, cta_text, cta_url, whatsapp_group_url, ad_slot, seo_title, seo_description, canonical_url, structured_data, status, published_at, created_at, updated_at, authors(name, slug), categories(name, slug), web_story_tags(tag_id, tags(id, name, slug))'
 
 function normalizeStructuredData(value) {
   if (!value) return null
@@ -73,6 +74,68 @@ function buildStoryPath(slug = '') {
   return `/web-stories/${slug}`
 }
 
+function normalizeTagIds(value) {
+  return [...new Set((Array.isArray(value) ? value : []).filter(Boolean))]
+}
+
+async function getTagsByIds(supabase, tagIds = []) {
+  if (!tagIds.length) return []
+
+  const { data: tags } = await supabase
+    .from('tags')
+    .select('id, name, slug')
+    .in('id', tagIds)
+
+  return tags || []
+}
+
+async function getStoryTags(supabase, storyId) {
+  const { data } = await supabase
+    .from('web_story_tags')
+    .select('tag_id, tags(id, name, slug)')
+    .eq('web_story_id', storyId)
+
+  return data || []
+}
+
+async function syncStoryTags(supabase, storyId, tagIds = []) {
+  const normalizedTagIds = normalizeTagIds(tagIds)
+
+  const { error: deleteError } = await supabase
+    .from('web_story_tags')
+    .delete()
+    .eq('web_story_id', storyId)
+
+  if (deleteError) {
+    throw new Error(deleteError.message)
+  }
+
+  if (normalizedTagIds.length === 0) {
+    return []
+  }
+
+  const { error: insertError } = await supabase
+    .from('web_story_tags')
+    .insert(normalizedTagIds.map((tagId) => ({
+      web_story_id: storyId,
+      tag_id: tagId,
+    })))
+
+  if (insertError) {
+    throw new Error(insertError.message)
+  }
+
+  return getTagsByIds(supabase, normalizedTagIds)
+}
+
+function revalidateTagSurfaces(tags = []) {
+  for (const tag of tags) {
+    if (tag?.slug) {
+      revalidatePath(`/tags/${tag.slug}`)
+    }
+  }
+}
+
 async function canMutateStory(supabase, storyId, user) {
   if (user.role === 'admin') return true
   const authorId = await getUserAuthorId(user.userId)
@@ -88,7 +151,7 @@ async function canMutateStory(supabase, storyId, user) {
 export async function GET(_request, { params }) {
   try {
     const user = await requireAuth()
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     const allowed = await canMutateStory(supabase, params.id, user)
     if (!allowed) return apiResponse(403, null, 'Forbidden')
 
@@ -102,14 +165,15 @@ export async function GET(_request, { params }) {
     return apiResponse(200, { story: data })
   } catch (error) {
     if (error.name === 'AuthError') return apiResponse(401, null, error.message)
-    return apiResponse(500, null, error.message || 'Failed to load story')
+    console.error(error)
+    return apiResponse(500, null, 'An internal error occurred')
   }
 }
 
 export async function PATCH(request, { params }) {
   try {
     const user = await requireAuth()
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     const allowed = await canMutateStory(supabase, params.id, user)
     if (!allowed) return apiResponse(403, null, 'Forbidden')
 
@@ -119,6 +183,10 @@ export async function PATCH(request, { params }) {
       .select('title, slug, cover_image, cover_image_alt, slides, seo_title, seo_description, canonical_url, structured_data, status, published_at')
       .eq('id', params.id)
       .maybeSingle()
+    const incomingTagIds = 'tags' in payload ? normalizeTagIds(payload.tags) : null
+    const existingStoryTags = incomingTagIds !== null
+      ? await getStoryTags(supabase, params.id)
+      : []
 
     const updates = {
       updated_at: toIsoDateTime(payload.updated_at) || new Date().toISOString(),
@@ -128,7 +196,6 @@ export async function PATCH(request, { params }) {
     if (typeof payload.slug === 'string' && payload.slug.trim()) updates.slug = slugFromText(payload.slug)
     if (typeof payload.cover_image === 'string' && payload.cover_image.trim()) updates.cover_image = payload.cover_image
     if (typeof payload.cover_image_alt === 'string') updates.cover_image_alt = payload.cover_image_alt.trim() || null
-    if (Array.isArray(payload.tags)) updates.tags = payload.tags
     if ('keywords' in payload) updates.keywords = normalizeManualKeywords(payload.keywords || [])
     if ('related_article_slug' in payload) updates.related_article_slug = payload.related_article_slug || null
     if ('seo_title' in payload) updates.seo_title = payload.seo_title?.trim() || null
@@ -234,19 +301,27 @@ export async function PATCH(request, { params }) {
       .single()
     if (error) return apiResponse(500, null, error.message)
 
+    let syncedTags = []
+    if (incomingTagIds !== null) {
+      syncedTags = await syncStoryTags(supabase, params.id, incomingTagIds)
+    }
+
     revalidateStorySurface(existingStory)
     revalidateStorySurface(data)
+    revalidateTagSurfaces(existingStoryTags.map((entry) => entry?.tags).filter(Boolean))
+    revalidateTagSurfaces(syncedTags)
     return apiResponse(200, { story: data })
   } catch (error) {
     if (error.name === 'AuthError') return apiResponse(401, null, error.message)
-    return apiResponse(500, null, error.message || 'Failed to update story')
+    console.error(error)
+    return apiResponse(500, null, 'An internal error occurred')
   }
 }
 
 export async function DELETE(_request, { params }) {
   try {
     const user = await requireAuth()
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     const allowed = await canMutateStory(supabase, params.id, user)
     if (!allowed) return apiResponse(403, null, 'Forbidden')
 
@@ -263,13 +338,10 @@ export async function DELETE(_request, { params }) {
     return apiResponse(200, { ok: true })
   } catch (error) {
     if (error.name === 'AuthError') return apiResponse(401, null, error.message)
-    return apiResponse(500, null, error.message || 'Failed to delete story')
+    console.error(error)
+    return apiResponse(500, null, 'An internal error occurred')
   }
 }
-
-
-
-
 
 
 

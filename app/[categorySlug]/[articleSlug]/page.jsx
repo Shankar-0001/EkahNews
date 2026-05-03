@@ -1,29 +1,90 @@
 import { createOptionalPublicClient } from '@/lib/supabase/public-server'
 import { notFound, permanentRedirect } from 'next/navigation'
-import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Calendar, Clock, TrendingUp } from 'lucide-react'
+import { Calendar, Clock } from 'lucide-react'
 import { format, formatDistanceToNow } from 'date-fns'
 import Link from 'next/link'
 import Image from 'next/image'
 import PublicHeader from '@/components/layout/PublicHeader'
 import StructuredData from '@/components/seo/StructuredData'
-import { InArticleAd } from '@/components/ads/AdComponent'
-import AdPlaceholder from '@/components/common/AdPlaceholder'
+import { SidebarAd } from '@/components/ads/AdComponent'
 import { buildArticleImageVariants, generateArticleSchemas } from '@/lib/seo-utils'
-import { calculateReadingTime, generateSixtySecondSummary, generateAeoSnapshot } from '@/lib/content-utils'
+import { calculateReadingTime, generateSixtySecondSummary } from '@/lib/content-utils'
 import ReadingProgressBar from '@/components/article/ReadingProgressBar'
-import StickyShareBar from '@/components/article/StickyShareBar'
 import ArticleSummaryToggles from '@/components/article/ArticleSummaryToggles'
-import ArticleMiniCard from '@/components/content/ArticleMiniCard'
+import ArticleFollowStrip from '@/components/article/ArticleFollowStrip'
+import ContinuousReader from '@/components/article/ContinuousReader'
+import DynamicRelatedSidebar from '@/components/article/DynamicRelatedSidebar'
 import Breadcrumb from '@/components/common/Breadcrumb'
 import SafeHtml from '@/components/SafeHtml'
-import { buildLanguageAlternates, getArticleCanonicalUrl, SITE_URL, slugFromText } from '@/lib/site-config'
+import { getArticleCanonicalUrl, SITE_URL, slugFromText } from '@/lib/site-config'
 import { buildArticleKeywords, keywordsToMetadataValue } from '@/lib/keywords'
 import { parseStructuredDataOverride } from '@/lib/seo-utils'
+import SchemaScript from '@/components/seo/SchemaScript'
+import { getBreadcrumbSchema, getFAQSchema, getNewsArticleSchema, getSpeakableSchema } from '@/lib/schema'
+import { filterBlockedCategories } from '@/lib/category-utils'
+import { runListQuery, runSingleQuery } from '@/lib/supabase/query-timeout'
+import { getAdSlotIds, hasRenderableAdSlot } from '@/lib/ads'
 
 export const revalidate = 1800
+
+const DEFAULT_OG_IMAGE = `${SITE_URL}/og-default.jpg`
+const ARTICLE_METADATA_SELECT = `
+        id,
+        title,
+        slug,
+        excerpt,
+        seo_title,
+        seo_description,
+        featured_image_url,
+        featured_image_alt,
+        og_image,
+        keywords,
+        canonical_url,
+        schema_type,
+        structured_data,
+        published_at,
+        updated_at,
+        status,
+        category_id,
+        author_id,
+        authors (id, name, slug),
+        categories (name, slug),
+        article_tags (tags (name, slug))
+      `
+const ARTICLE_METADATA_SELECT_FALLBACK = ARTICLE_METADATA_SELECT.replace('        og_image,\n', '')
+const ARTICLE_PAGE_SELECT = `
+        id,
+        title,
+        slug,
+        excerpt,
+        content,
+        content_json,
+        featured_image_url,
+        featured_image_alt,
+        og_image,
+        keywords,
+        canonical_url,
+        schema_type,
+        structured_data,
+        published_at,
+        updated_at,
+        status,
+        category_id,
+        author_id,
+        authors (id, slug, name, bio, avatar_url),
+        categories (name, slug),
+        article_tags (tags (id, name, slug))
+      `
+const ARTICLE_PAGE_SELECT_FALLBACK = ARTICLE_PAGE_SELECT.replace('        og_image,\n', '')
+
+function isMissingOgImageColumnError(error) {
+  const message = error?.message || ''
+  return typeof message === 'string'
+    && message.includes('og_image')
+    && message.toLowerCase().includes('column')
+}
 
 export async function generateStaticParams() {
   const supabase = createOptionalPublicClient()
@@ -31,11 +92,15 @@ export async function generateStaticParams() {
     return []
   }
 
-  const { data: articles } = await supabase
-    .from('articles')
-    .select('slug, categories(slug)')
-    .eq('status', 'published')
-    .limit(10)
+  const { data: articles } = await runListQuery(
+    (signal) => supabase
+      .from('articles')
+      .select('slug, categories(slug)')
+      .eq('status', 'published')
+      .limit(10)
+      .abortSignal(signal),
+    { label: 'generateStaticParams:articles' }
+  )
 
   return articles?.map((article) => ({
     categorySlug: article.categories?.slug || 'news',
@@ -55,33 +120,34 @@ export async function generateMetadata({ params }) {
 
     const { articleSlug } = params
 
-    const { data: article } = await supabase
-      .from('articles')
-      .select(`
-        id,
-        title,
-        slug,
-        excerpt,
-        seo_title,
-        seo_description,
-        featured_image_url,
-        featured_image_alt,
-        keywords,
-        canonical_url,
-        schema_type,
-        structured_data,
-        published_at,
-        updated_at,
-        status,
-        category_id,
-        author_id,
-        authors (id, name, slug),
-        categories (name, slug),
-        article_tags (tags (name, slug))
-      `)
-      .eq('slug', articleSlug)
-      .eq('status', 'published')
-      .single()
+    let article
+    try {
+      article = await runSingleQuery(
+        (signal) => supabase
+          .from('articles')
+          .select(ARTICLE_METADATA_SELECT)
+          .eq('slug', articleSlug)
+          .eq('status', 'published')
+          .maybeSingle()
+          .abortSignal(signal),
+        { label: 'generateMetadata:getArticleBySlug' }
+      )
+    } catch (error) {
+      if (!isMissingOgImageColumnError(error)) {
+        throw error
+      }
+
+      article = await runSingleQuery(
+        (signal) => supabase
+          .from('articles')
+          .select(ARTICLE_METADATA_SELECT_FALLBACK)
+          .eq('slug', articleSlug)
+          .eq('status', 'published')
+          .maybeSingle()
+          .abortSignal(signal),
+        { label: 'generateMetadata:getArticleBySlug:fallback' }
+      )
+    }
 
     if (!article) {
       return {
@@ -89,18 +155,23 @@ export async function generateMetadata({ params }) {
       }
     }
 
+    const ogImage = article.og_image || article.featured_image_url || DEFAULT_OG_IMAGE
     let metadataImageMeta = null
-    if (article.featured_image_url) {
-      const { data: mediaRow } = await supabase
-        .from('media_library')
-        .select('original_width, original_height')
-        .eq('file_url', article.featured_image_url)
-        .maybeSingle()
-      metadataImageMeta = mediaRow || null
+    if (ogImage) {
+      metadataImageMeta = await runSingleQuery(
+        (signal) => supabase
+          .from('media_library')
+          .select('original_width, original_height')
+          .eq('file_url', ogImage)
+          .maybeSingle()
+          .abortSignal(signal),
+        { label: 'generateMetadata:getArticleImageMeta' }
+      )
     }
 
     const articleForMetadata = {
       ...article,
+      featured_image_url: ogImage,
       featured_image_width: metadataImageMeta?.original_width || null,
       featured_image_height: metadataImageMeta?.original_height || null,
     }
@@ -115,15 +186,16 @@ export async function generateMetadata({ params }) {
 
     return {
       title: article.seo_title || article.title,
-      description: article.seo_description || article.excerpt,
+      description: article.seo_description || article.excerpt || article.title,
       keywords: keywordsToMetadataValue(keywords),
       authors: article.authors ? [{ name: article.authors.name, url: `${siteUrl}/authors/${authorLinkSlug}` }] : [],
       openGraph: {
         title: article.seo_title || article.title,
-        description: article.seo_description || article.excerpt,
+        description: article.seo_description || article.excerpt || article.title,
         type: 'article',
+        section: article.categories?.name || params.categorySlug,
         publishedTime: article.published_at,
-        modifiedTime: article.updated_at,
+        modifiedTime: article.updated_at || article.published_at,
         authors: article.authors?.name ? [article.authors.name] : [],
         images: buildArticleImageVariants(articleForMetadata).map((image) => ({
           url: image.url,
@@ -136,12 +208,15 @@ export async function generateMetadata({ params }) {
       twitter: {
         card: 'summary_large_image',
         title: article.seo_title || article.title,
-        description: article.seo_description || article.excerpt,
+        description: article.seo_description || article.excerpt || article.title,
         images: buildArticleImageVariants(articleForMetadata).map((image) => image.url),
       },
       alternates: {
         canonical: articleUrl,
-        languages: buildLanguageAlternates(`/${article.categories?.slug || 'news'}/${article.slug}`),
+        languages: {
+          en: articleUrl,
+          'x-default': articleUrl,
+        },
       },
       robots: {
         index: true,
@@ -159,126 +234,243 @@ export async function generateMetadata({ params }) {
 }
 
 export default async function ArticlePage({ params }) {
+  const supabase = createOptionalPublicClient()
+  if (!supabase) {
+    notFound()
+  }
+
+  const { categorySlug, articleSlug } = params
+  const siteUrl = SITE_URL
+  const isBuildTime = process.env.npm_lifecycle_event === 'build'
+  const adSlots = getAdSlotIds()
+  const shouldRenderSidebarAd = hasRenderableAdSlot(adSlots.sidebar)
+
+  let article
+  let isDatabaseUnavailable = false
   try {
-    const supabase = createOptionalPublicClient()
-    if (!supabase) {
-      notFound()
-    }
-
-    const { categorySlug, articleSlug } = params
-    const siteUrl = SITE_URL
-
-    const { data: article } = await supabase
-      .from('articles')
-      .select(`
-        id,
-        title,
-        slug,
-        excerpt,
-        content,
-        content_json,
-        featured_image_url,
-        featured_image_alt,
-        keywords,
-        canonical_url,
-        schema_type,
-        structured_data,
-        published_at,
-        updated_at,
-        status,
-        category_id,
-        author_id,
-        authors (id, slug, name, bio, avatar_url),
-        categories (name, slug),
-        article_tags (tags (id, name, slug))
-      `)
+    article = await runSingleQuery(
+      (signal) => supabase
+        .from('articles')
+        .select(ARTICLE_PAGE_SELECT)
       .eq('slug', articleSlug)
       .eq('status', 'published')
-      .single()
-
-    if (!article) {
+      .maybeSingle()
+      .abortSignal(signal),
+      { label: 'getArticleBySlug', throwOnUnavailable: true }
+    )
+  } catch (error) {
+    if (isMissingOgImageColumnError(error)) {
+      try {
+        article = await runSingleQuery(
+          (signal) => supabase
+            .from('articles')
+            .select(ARTICLE_PAGE_SELECT_FALLBACK)
+            .eq('slug', articleSlug)
+            .eq('status', 'published')
+            .maybeSingle()
+            .abortSignal(signal),
+          { label: 'getArticleBySlug:fallback', throwOnUnavailable: true }
+        )
+      } catch (fallbackError) {
+        if (fallbackError.message === 'DATABASE_UNAVAILABLE') {
+          console.error('Article fetch failed: database unavailable', {
+            slug: articleSlug,
+            category: categorySlug,
+          })
+          if (isBuildTime) {
+            notFound()
+          }
+          isDatabaseUnavailable = true
+        } else {
+          console.error('Article fetch failed:', {
+            slug: articleSlug,
+            category: categorySlug,
+            error: fallbackError,
+          })
+          notFound()
+        }
+      }
+    } else if (error.message === 'DATABASE_UNAVAILABLE') {
+      console.error('Article fetch failed: database unavailable', {
+        slug: articleSlug,
+        category: categorySlug,
+      })
+      if (isBuildTime) {
+        notFound()
+      }
+      isDatabaseUnavailable = true
+    } else {
+      console.error('Article fetch failed:', {
+        slug: articleSlug,
+        category: categorySlug,
+        error,
+      })
       notFound()
     }
+  }
 
-    if (article.categories?.slug && article.categories.slug !== categorySlug) {
-      permanentRedirect(`/${article.categories.slug}/${article.slug}`)
-    }
+  if (isDatabaseUnavailable) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <PublicHeader categories={[]} />
+        <div className="w-full max-w-6xl mx-auto px-4 py-6 pb-16 md:py-8 md:pb-10 lg:px-8">
+          <div className="w-full max-w-xl rounded-[24px] border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
+              Article temporarily unavailable
+            </h1>
+            <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">
+              We could not load this story right now because the content service is unavailable. Please try again in a little while.
+            </p>
+            <Link
+              href="/"
+              className="mt-6 inline-flex items-center justify-center border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-900 transition-colors hover:border-[#b4235a] hover:text-[#b4235a] dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:border-[#d94b7d] dark:hover:text-[#d94b7d]"
+            >
+              Return to homepage
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
-    let authorProfile = article.authors || null
-    let featuredImageMeta = null
+  if (!article) {
+    console.error('Article fetch returned no data:', {
+      slug: articleSlug,
+      category: categorySlug,
+    })
+    notFound()
+  }
 
-    if (article.featured_image_url) {
-      const { data: mediaRow } = await supabase
-        .from('media_library')
-        .select('original_width, original_height')
-        .eq('file_url', article.featured_image_url)
-        .maybeSingle()
-      featuredImageMeta = mediaRow || null
-    }
+  if (article.categories?.slug && article.categories.slug !== categorySlug) {
+    permanentRedirect(`/${article.categories.slug}/${article.slug}`)
+  }
 
-    if (
-      (
-        !authorProfile?.bio
-        || !authorProfile?.name
-        || !authorProfile?.slug
-        || !authorProfile?.title
-        || !authorProfile?.email
+  let authorProfile = article.authors || null
+  let featuredImageMeta = null
+
+  if (article.featured_image_url) {
+    try {
+      featuredImageMeta = await runSingleQuery(
+        (signal) => supabase
+          .from('media_library')
+          .select('original_width, original_height')
+          .eq('file_url', article.featured_image_url)
+          .maybeSingle()
+          .abortSignal(signal),
+        { label: 'getArticleImageMeta' }
       )
-      && article.author_id
-    ) {
-      const { data: profileRow } = await supabase
-        .from('authors')
-        .select('id, slug, name, bio, avatar_url, title, email')
-        .eq('id', article.author_id)
-        .maybeSingle()
-      authorProfile = profileRow || authorProfile
+    } catch (error) {
+      console.error('Article image metadata fetch failed:', error?.message || error)
+      featuredImageMeta = null
     }
+  }
 
-    const tagIds = (article.article_tags || [])
-      .map((at) => at.tags?.id)
-      .filter(Boolean)
+  if (
+    (
+      !authorProfile?.bio
+      || !authorProfile?.name
+      || !authorProfile?.slug
+      || !authorProfile?.title
+      || !authorProfile?.email
+    )
+    && article.author_id
+  ) {
+    try {
+      authorProfile = await runSingleQuery(
+        (signal) => supabase
+          .from('authors')
+          .select('id, slug, name, bio, avatar_url, title, email')
+          .eq('id', article.author_id)
+          .maybeSingle()
+          .abortSignal(signal),
+        { label: 'getAuthorProfile' }
+      ) || authorProfile
+    } catch (error) {
+      console.error('Author profile fetch failed:', error?.message || error)
+    }
+  }
 
+  const tagIds = (article.article_tags || [])
+    .map((at) => at.tags?.id)
+    .filter(Boolean)
+
+  let relatedByCategory = []
+  let latestArticles = []
+  let engagementRows = []
+  let categories = []
+  let linkRows = []
+
+  try {
     const [
-      { data: relatedByCategory },
-      { data: latestArticles },
-      { data: engagementRows },
-      { data: categories },
-      { data: linkRows },
+      relatedByCategoryResult,
+      latestArticlesResult,
+      engagementRowsResult,
+      categoriesResult,
+      linkRowsResult,
     ] = await Promise.all([
-      supabase
-        .from('articles')
-        .select('id, title, slug, excerpt, featured_image_url, published_at, categories(slug), authors(name)')
-        .eq('category_id', article.category_id)
-        .eq('status', 'published')
-        .neq('id', article.id)
-        .order('published_at', { ascending: false })
-        .limit(12),
-      supabase
-        .from('articles')
-        .select('id, title, slug, excerpt, featured_image_url, published_at, categories(slug), authors(name)')
-        .eq('status', 'published')
-        .neq('id', article.id)
-        .order('published_at', { ascending: false })
-        .limit(12),
-      supabase
-        .from('article_engagement')
-        .select('article_id, views, likes, shares')
-        .order('views', { ascending: false })
-        .order('shares', { ascending: false })
-        .limit(60),
-      supabase
-        .from('categories')
-        .select('id, name, slug')
-        .order('name'),
+      runListQuery(
+        (signal) => supabase
+          .from('articles')
+          .select('id, title, slug, excerpt, featured_image_url, published_at, categories(slug), authors(name)')
+          .eq('category_id', article.category_id)
+          .eq('status', 'published')
+          .neq('id', article.id)
+          .order('published_at', { ascending: false })
+          .limit(12)
+          .abortSignal(signal),
+        { label: 'getRelatedByCategory' }
+      ),
+      runListQuery(
+        (signal) => supabase
+          .from('articles')
+          .select('id, title, slug, excerpt, featured_image_url, published_at, categories(slug), authors(name)')
+          .eq('status', 'published')
+          .neq('id', article.id)
+          .order('published_at', { ascending: false })
+          .limit(4)
+          .abortSignal(signal),
+        { label: 'getLatestArticles' }
+      ),
+      runListQuery(
+        (signal) => supabase
+          .from('article_engagement')
+          .select('article_id, views, likes, shares')
+          .order('views', { ascending: false })
+          .order('shares', { ascending: false })
+          .limit(60)
+          .abortSignal(signal),
+        { label: 'getArticleEngagement' }
+      ),
+      runListQuery(
+        (signal) => supabase
+          .from('categories')
+          .select('id, name, slug')
+          .order('name')
+          .abortSignal(signal),
+        { label: 'getArticlePageCategories' }
+      ),
       tagIds.length > 0
-        ? supabase
-          .from('article_tags')
-          .select('article_id')
-          .neq('article_id', article.id)
-          .in('tag_id', tagIds)
-          .limit(30)
+        ? runListQuery(
+          (signal) => supabase
+            .from('article_tags')
+            .select('article_id')
+            .neq('article_id', article.id)
+            .in('tag_id', tagIds)
+            .limit(30)
+            .abortSignal(signal),
+          { label: 'getRelatedTagLinks' }
+        )
         : Promise.resolve({ data: [] }),
     ])
+
+    relatedByCategory = relatedByCategoryResult?.data || []
+    latestArticles = latestArticlesResult?.data || []
+    engagementRows = engagementRowsResult?.data || []
+    categories = categoriesResult?.data || []
+    linkRows = linkRowsResult?.data || []
+  } catch (error) {
+    console.error('Supplementary article data fetch failed:', error?.message || error)
+  }
 
     let relatedByTag = []
     const tagMatchCount = new Map()
@@ -290,14 +482,22 @@ export default async function ArticlePage({ params }) {
 
       const ids = [...new Set((linkRows || []).map((r) => r.article_id).filter(Boolean))]
       if (ids.length > 0) {
-        const { data: taggedArticles } = await supabase
-          .from('articles')
-          .select('id, title, slug, excerpt, featured_image_url, published_at, categories(slug), authors(name)')
-          .in('id', ids)
-          .eq('status', 'published')
-          .order('published_at', { ascending: false })
-          .limit(12)
-        relatedByTag = taggedArticles || []
+        try {
+          const { data: taggedArticles } = await runListQuery(
+            (signal) => supabase
+              .from('articles')
+              .select('id, title, slug, excerpt, featured_image_url, published_at, categories(slug), authors(name)')
+              .in('id', ids)
+              .eq('status', 'published')
+              .order('published_at', { ascending: false })
+              .limit(12)
+              .abortSignal(signal),
+            { label: 'getRelatedByTag' }
+          )
+          relatedByTag = taggedArticles || []
+        } catch (error) {
+          console.error('Tag-based related articles fetch failed:', error?.message || error)
+        }
       }
     }
 
@@ -327,43 +527,21 @@ export default async function ArticlePage({ params }) {
       relatedCandidates.set(item.id, { ...item, _score: relevanceScore })
     }
 
-    const relatedArticles = Array.from(relatedCandidates.values())
+    const sortedRelatedArticles = Array.from(relatedCandidates.values())
       .sort((a, b) => {
         if (b._score !== a._score) return b._score - a._score
         return new Date(b.published_at || 0).getTime() - new Date(a.published_at || 0).getTime()
       })
-      .slice(0, 4)
 
-    const trendingIds = [...new Set((engagementRows || []).map((row) => row.article_id).filter(Boolean))]
-    let trendingArticles = []
-    if (trendingIds.length > 0) {
-      const { data: trendingPool } = await supabase
-        .from('articles')
-        .select('id, title, slug, excerpt, featured_image_url, published_at, categories(slug), authors(name)')
-        .in('id', trendingIds)
-        .eq('status', 'published')
-        .neq('id', article.id)
-        .limit(20)
+    // Keep the sidebar topically tight whenever the category has enough coverage.
+    const sameCategoryRelatedArticles = sortedRelatedArticles.filter(
+      (item) => item.categories?.slug === article.categories?.slug
+    )
 
-      const sortedTrending = (trendingPool || [])
-        .map((item) => ({ ...item, _score: scoreMap.get(item.id) || 0 }))
-        .sort((a, b) => {
-          if (b._score !== a._score) return b._score - a._score
-          return new Date(b.published_at || 0).getTime() - new Date(a.published_at || 0).getTime()
-        })
-
-      trendingArticles = sortedTrending.slice(0, 5)
-    }
-
-    if (trendingArticles.length < 5) {
-      const existingIds = new Set(trendingArticles.map((item) => item.id))
-      for (const item of latestArticles || []) {
-        if (!item?.id || item.id === article.id || existingIds.has(item.id)) continue
-        trendingArticles.push(item)
-        existingIds.add(item.id)
-        if (trendingArticles.length >= 5) break
-      }
-    }
+    const relatedArticles = (sameCategoryRelatedArticles.length > 0
+      ? sameCategoryRelatedArticles
+      : sortedRelatedArticles
+    ).slice(0, 3)
 
     const articleUrl = getArticleCanonicalUrl(article)
     const authorLinkSlug = authorProfile?.slug
@@ -380,7 +558,6 @@ export default async function ArticlePage({ params }) {
 
     const readingTimeMinutes = calculateReadingTime(article.content || '')
     const summaryPoints = generateSixtySecondSummary(article)
-    const aeoSnapshot = generateAeoSnapshot(article)
     const structuredOverride = parseStructuredDataOverride(article.structured_data)
     const schemas = generateArticleSchemas({
       article: articleWithImageMeta,
@@ -394,17 +571,53 @@ export default async function ArticlePage({ params }) {
       ],
     })
 
+    const filteredCategories = filterBlockedCategories(categories || [])
+    const articleSchema = getNewsArticleSchema({
+      title: article.title,
+      description: article.excerpt || article.seo_description || '',
+      url: articleUrl,
+      imageUrl: article.featured_image_url || `${SITE_URL}/og-default.jpg`,
+      publishedAt: article.published_at,
+      updatedAt: article.updated_at || article.published_at,
+      authorName: authorProfile?.name || article.authors?.name || 'EkahNews',
+      authorUrl: `${SITE_URL}/authors/${authorLinkSlug}`,
+      categoryName: article.categories?.name || categorySlug,
+    })
+    const breadcrumbSchema = getBreadcrumbSchema([
+      { name: 'Home', url: SITE_URL },
+      { name: article.categories?.name || categorySlug, url: `${SITE_URL}/category/${article.categories?.slug || categorySlug}` },
+      { name: article.title, url: articleUrl },
+    ])
+    const schemaBlocks = [articleSchema, breadcrumbSchema]
+    const maybeFaqs = Array.isArray(article?.faqs)
+      ? article.faqs
+      : Array.isArray(article?.content_json?.faqs)
+        ? article.content_json.faqs
+        : []
+    if (maybeFaqs.length > 0) {
+      schemaBlocks.push(getFAQSchema(maybeFaqs))
+    } else {
+      // FAQPage schema ready — add article.faqs field to content model to enable
+    }
+    schemaBlocks.push(getSpeakableSchema(articleUrl))
+
     return (
       <>
         <StructuredData data={schemas.primaryArticle} />
         <StructuredData data={schemas.breadcrumbList} />
+        <SchemaScript schema={schemaBlocks} />
 
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-          <PublicHeader categories={categories || []} />
+          <PublicHeader categories={filteredCategories} />
 
-          <article className="w-full max-w-6xl mx-auto px-4 py-6 pb-16 md:py-8 md:pb-10 lg:px-8">
+          <article
+            className="w-full max-w-6xl mx-auto px-4 py-6 pb-16 md:py-8 md:pb-10 lg:px-8"
+            data-article-url={`/${params.categorySlug}/${params.articleSlug}`}
+            data-article-title={article.title}
+            data-article-slug={params.articleSlug}
+            data-article-category={params.categorySlug}
+          >
             <ReadingProgressBar />
-            <StickyShareBar articleUrl={articleUrl} articleTitle={article.title} />
             <div className="mb-6">
               <Breadcrumb
                 items={[
@@ -429,18 +642,18 @@ export default async function ArticlePage({ params }) {
                   </Badge>
                 </div>
 
-                <h1 className="mt-5 max-w-4xl text-[34px] font-extrabold leading-[1.03] tracking-tight text-slate-900 dark:text-white md:text-[58px]">
+                <h1 className="mt-4 max-w-4xl text-[34px] font-extrabold leading-[1.03] tracking-tight text-slate-900 dark:text-white md:text-[30px]">
                   {article.title}
                 </h1>
 
                 {article.excerpt && (
-                  <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-700 dark:text-slate-300">
+                  <p className="mt-5 max-w-4xl text-lg leading-8 text-slate-700 dark:text-slate-300">
                     {article.excerpt}
                   </p>
                 )}
 
-                <div className="mt-6 flex flex-wrap items-center gap-4 border border-slate-200 bg-white/85 px-4 py-4 text-sm text-slate-600 shadow-sm dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-400 md:gap-6">
-                  <div className="flex min-w-0 flex-1 items-center gap-3 sm:min-w-[220px]">
+                <div className="mt-4 flex flex-wrap items-center gap-3 px-1 py-2 text-sm text-slate-600 dark:text-slate-400 md:gap-4">
+                  <div className="flex min-w-0 flex-1 items-center gap-2.5 sm:min-w-[220px]">
                     <Avatar className="h-11 w-11">
                       <AvatarImage src={authorProfile?.avatar_url || ''} />
                       <AvatarFallback>
@@ -448,30 +661,26 @@ export default async function ArticlePage({ params }) {
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex flex-col">
-                      <span className="text-xs uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">Byline</span>
                       <Link href={`/authors/${authorLinkSlug}`} className="font-semibold text-slate-900 hover:text-[#d62828] hover:underline dark:text-white dark:hover:text-red-400">
                         {authorProfile?.name || article.authors?.name}
                       </Link>
+                      <div className="mt-0.5 flex flex-col gap-0.5 text-xs font-semibold leading-5 text-slate-600 dark:text-slate-300">
+                        <div>
+                          <time dateTime={article.published_at}>
+                            Published {format(new Date(article.published_at), 'MMMM d, yyyy • h:mm a')}
+                          </time>
+                        </div>
+                        {article.updated_at !== article.published_at && (
+                          <div>
+                            <time dateTime={article.updated_at}>
+                              Updated {format(new Date(article.updated_at), 'MMMM d, yyyy • h:mm a')}
+                            </time>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    <time dateTime={article.published_at}>
-                      Published {format(new Date(article.published_at), 'MMMM d, yyyy')}
-                    </time>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
-                    <span>{formatDistanceToNow(new Date(article.published_at), { addSuffix: true })}</span>
-                  </div>
-                  {article.updated_at !== article.published_at && (
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      <time dateTime={article.updated_at}>
-                        Updated {format(new Date(article.updated_at), 'MMMM d, yyyy')}
-                      </time>
-                    </div>
-                  )}
+                  <ArticleFollowStrip articleUrl={articleUrl} articleTitle={article.title} />
                 </div>
               </div>
             </header>
@@ -493,146 +702,59 @@ export default async function ArticlePage({ params }) {
 
             <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,1fr)_320px]">
               <div className="space-y-8">
-                <Card className="border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:p-6 lg:p-8">
-                  <div className="mx-auto max-w-[740px]">
+                <div>
+                  <div className="w-full">
                     <ArticleSummaryToggles
                       summaryPoints={summaryPoints}
-                      aeoSnapshot={aeoSnapshot}
-                      articleId={article.id}
-                      articleUrl={articleUrl}
-                      articleTitle={article.title}
                     />
 
                     <SafeHtml
                       html={article.content || ''}
                       baseUrl={siteUrl}
-                      className="article-content prose prose-lg prose-slate max-w-none prose-headings:scroll-mt-28 prose-headings:font-bold prose-h2:mt-10 prose-h2:text-2xl prose-h3:mt-8 prose-h3:text-xl prose-p:leading-8 prose-li:leading-7 prose-strong:text-slate-900 dark:prose-invert dark:prose-strong:text-white"
+                      className="article-content prose prose-slate max-w-none prose-headings:font-bold prose-headings:text-slate-900 prose-headings:leading-snug prose-h2:text-xl prose-h2:mt-6 prose-h2:mb-2 prose-h3:text-lg prose-h3:mt-5 prose-h3:mb-2 prose-p:text-base prose-p:leading-7 prose-p:text-slate-800 prose-p:my-3 prose-a:text-blue-600 prose-a:no-underline prose-a:hover:underline prose-strong:text-slate-900 prose-img:rounded-none prose-img:my-4 prose-blockquote:border-l-2 prose-blockquote:border-slate-300 prose-blockquote:text-slate-600 prose-blockquote:pl-4 prose-blockquote:my-4 dark:prose-invert"
                     />
 
-                    {article.article_tags && article.article_tags.length > 0 && (
-                      <div className="mt-10 border-t border-slate-200 pt-8 dark:border-slate-800">
-                        <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                          Story Tags
-                        </h2>
-                        <div className="mt-4 flex flex-wrap gap-2">
-                          {article.article_tags.map((at) => (
-                            <Link key={at.tags.slug} href={`/tags/${at.tags.slug}`}>
-                              <Badge variant="outline" className="cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800">
-                                {at.tags.name}
-                              </Badge>
-                            </Link>
-                          ))}
+                    {(article.article_tags || []).length > 0 && (
+                      <div className="mt-8 border-t border-slate-200 pt-6 dark:border-slate-800">
+                        <div className="flex flex-wrap gap-2">
+                          {article.article_tags
+                            .map((entry) => entry?.tags)
+                            .filter(Boolean)
+                            .map((tag) => (
+                              <Link key={tag.id || tag.slug} href={`/tags/${tag.slug}`}>
+                                <Badge variant="secondary" className="px-3 py-1 text-sm hover:bg-slate-200 dark:hover:bg-slate-800">
+                                  {tag.name}
+                                </Badge>
+                              </Link>
+                            ))}
                         </div>
                       </div>
                     )}
+
                   </div>
-                </Card>
+                </div>
 
-                {relatedArticles && relatedArticles.length > 0 && (
-                  <section>
-                    <div className="mb-5 flex items-center justify-between">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
-                          Keep Reading
-                        </p>
-                        <h2 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">
-                          Related Articles
-                        </h2>
-                      </div>
-                    </div>
-                    <div className="grid gap-5 md:grid-cols-2">
-                      {relatedArticles.map((related) => (
-                        <ArticleMiniCard key={related.id} article={related} compact />
-                      ))}
-                    </div>
-                  </section>
-                )}
-
+                <ContinuousReader
+                  initialSlug={params.articleSlug}
+                  initialCategorySlug={params.categorySlug}
+                  initialTitle={article.title}
+                />
               </div>
 
               <aside className="space-y-6 xl:sticky xl:top-28">
-                {latestArticles && latestArticles.length > 0 && (
-                  <aside className="h-full border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-[#d62828] dark:text-red-400" />
-                      <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-600 dark:text-slate-300">
-                        Latest News
-                      </p>
-                    </div>
-                    <div className="mt-3 grid gap-2">
-                      {latestArticles.slice(0, 4).map((item) => (
-                        <Link
-                          key={item.id}
-                          href={`/${item.categories?.slug || 'news'}/${item.slug}`}
-                          className="group grid min-w-0 grid-cols-[minmax(0,1fr)_72px] items-center gap-2 p-2 sm:grid-cols-[minmax(0,1fr)_80px] sm:p-2.5 lg:grid-cols-[minmax(0,1fr)_88px]"
-                        >
-                          <div className="min-w-0">
-                            <p className="break-words text-[0.92rem] font-medium leading-snug text-slate-900 decoration-current underline-offset-4 group-hover:underline dark:text-white sm:text-[0.98rem]">
-                              {item.title}
-                            </p>
-                            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600 dark:text-slate-400 sm:text-sm">
-                              {item.published_at && (
-                                <span>{formatDistanceToNow(new Date(item.published_at), { addSuffix: true })}</span>
-                              )}
-                              {item.authors?.name && (
-                                <span>by {item.authors.name}</span>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="relative h-[72px] w-[72px] overflow-hidden bg-slate-100 dark:bg-slate-800 sm:h-[80px] sm:w-[80px] lg:h-[88px] lg:w-[88px]">
-                            {item.featured_image_url ? (
-                              <Image
-                                src={item.featured_image_url}
-                                alt={item.title}
-                                fill
-                                className="object-cover"
-                                sizes="(max-width: 639px) 72px, (max-width: 1023px) 80px, 88px"
-                              />
-                            ) : (
-                              <div className="flex h-full items-center justify-center text-xs font-medium text-slate-400 dark:text-slate-500">
-                                img
-                              </div>
-                            )}
-                          </div>
-                        </Link>
-                      ))}
-                    </div>
-                  </aside>
+                {(relatedArticles?.length || 0) > 0 && (
+                  <DynamicRelatedSidebar
+                    initialArticleSlug={params.articleSlug}
+                    initialCategorySlug={params.categorySlug}
+                    initialRelatedStories={relatedArticles.slice(0, 3)}
+                  />
                 )}
 
-                {trendingArticles && trendingArticles.length > 0 && (
-                  <aside className="h-full border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className="h-4 w-4 text-[#d62828]" />
-                      <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
-                        Popular Now
-                      </p>
-                    </div>
-                    <div className="mt-3 space-y-2">
-                      {trendingArticles.map((item, index) => (
-                        <Link
-                          key={item.id}
-                          href={`/${item.categories?.slug || 'news'}/${item.slug}`}
-                          className="group flex gap-2 p-1.5 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800"
-                        >
-                          <span className="mt-1 text-lg font-black text-slate-300 dark:text-slate-600">
-                            {String(index + 1).padStart(2, '0')}
-                          </span>
-                          <div className="min-w-0">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
-                              {item.categories?.name || 'News'}
-                            </p>
-                            <h3 className="mt-1 line-clamp-3 text-sm font-semibold leading-6 text-slate-900 dark:text-white">
-                              <span className="group-hover:underline group-hover:underline-offset-4">
-                                {item.title}
-                              </span>
-                            </h3>
-                          </div>
-                        </Link>
-                      ))}
-                    </div>
-                  </aside>
+                {/* Hide the entire sidebar slot until a live ad config exists. */}
+                {shouldRenderSidebarAd && (
+                  <div className="rounded-[24px] border border-dashed border-slate-300 bg-white/70 p-4 text-center dark:border-slate-700 dark:bg-slate-900/60">
+                    <SidebarAd />
+                  </div>
                 )}
               </aside>
             </div>
@@ -640,16 +762,5 @@ export default async function ArticlePage({ params }) {
         </div>
       </>
     )
-  } catch {
-    notFound()
-  }
+  
 }
-
-
-
-
-
-
-
-
-

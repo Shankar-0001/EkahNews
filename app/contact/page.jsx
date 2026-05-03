@@ -4,6 +4,7 @@ import PublicHeader from '@/components/layout/PublicHeader'
 import StructuredData from '@/components/seo/StructuredData'
 import { absoluteUrl, getPublicationContactInfo } from '@/lib/site-config'
 import { getRenderableHtml, getStaticPageDefinition, getStaticPageOverride } from '@/lib/static-pages'
+import { filterBlockedCategories } from '@/lib/category-utils'
 
 export async function generateMetadata() {
   const definition = getStaticPageDefinition('contact')
@@ -14,6 +15,9 @@ export async function generateMetadata() {
     description: override?.seo_description
       || definition?.seoDescription
       || 'Contact the EkahNews editorial and support teams.',
+    alternates: {
+      canonical: absoluteUrl('/contact'),
+    },
   }
 }
 
@@ -23,6 +27,7 @@ export default async function ContactPage() {
     .from('categories')
     .select('id, name, slug')
     .order('name')
+  const filteredCategories = filterBlockedCategories(categories || [])
 
   const override = await getStaticPageOverride('contact')
   const pageTitle = override?.title || 'Contact'
@@ -53,16 +58,15 @@ export default async function ContactPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <StructuredData data={schema} />
-      <PublicHeader categories={categories || []} />
+      <PublicHeader categories={filteredCategories} />
       <main className="w-full max-w-6xl mx-auto px-4 py-10">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{pageTitle}</h1>
         {contentHtml ? (
           <SafeHtml
             html={contentHtml}
-            className="mt-6 prose prose-slate dark:prose-invert max-w-none"
+            className="static-page-content max-w-none"
           />
         ) : (
-          <div className="mt-6 space-y-4 text-gray-700 dark:text-gray-300">
+          <div className="space-y-4 text-gray-700 dark:text-gray-300">
             <p>
               For editorial feedback, corrections, or general inquiries, please reach out to our newsroom team.
             </p>
@@ -74,26 +78,7 @@ export default async function ContactPage() {
             </p>
           </div>
         )}
-        <section className="mt-10 grid gap-4 md:grid-cols-2">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Newsroom</h2>
-            <div className="mt-3 space-y-2 text-sm text-slate-600 dark:text-slate-400">
-              <p>Email: {contact.editorialEmail || contact.email || 'Not configured yet'}</p>
-              {contact.phone && <p>Phone: {contact.phone}</p>}
-              {contact.whatsapp && <p>WhatsApp tipline: {contact.whatsapp}</p>}
-            </div>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Corrections</h2>
-            <div className="mt-3 space-y-2 text-sm text-slate-600 dark:text-slate-400">
-              <p>Email: {contact.correctionsEmail || contact.email || 'Use the contact form details above'}</p>
-              {contact.address && <p>Address: {contact.address}</p>}
-              {!contact.address && <p>Share the article URL and a short explanation so the team can review it quickly.</p>}
-            </div>
-          </div>
-        </section>
       </main>
     </div>
   )
 }
-

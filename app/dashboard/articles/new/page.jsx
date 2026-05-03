@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -13,7 +14,7 @@ import {
   getImageDimensions,
 } from '@/lib/image-utils'
 import { formatFileSize } from '@/lib/image-utils'
-import SafeHtml from '@/components/SafeHtml'
+import SafeHtmlPreview from '@/components/SafeHtmlPreview'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -39,6 +40,8 @@ const TipTapEditor = dynamic(() => import('@/components/editor/TipTapEditor'), {
   ssr: false,
   loading: () => <p className="text-sm text-gray-500">Loading editor...</p>,
 })
+
+const ARTICLE_DRAFT_STORAGE_KEY = 'ekahnews:new-article-draft'
 
 function findLatestNewsCategory(categories = []) {
   return (
@@ -91,6 +94,12 @@ function RequiredLabel({ children }) {
   )
 }
 
+function getSeoCounterClassName(length, idealMin, idealMax) {
+  if (length > idealMax) return 'text-xs mt-1 text-red-600 dark:text-red-400'
+  if (length >= idealMin) return 'text-xs mt-1 text-emerald-600 dark:text-emerald-400'
+  return 'text-xs mt-1 text-gray-500 dark:text-gray-400'
+}
+
 export default function ArticleEditorPage() {
   const router = useRouter()
   const supabase = createClient()
@@ -114,6 +123,7 @@ export default function ArticleEditorPage() {
   const [selectedTags, setSelectedTags] = useState([])
   const [featuredImage, setFeaturedImage] = useState('')
   const [featuredImageAlt, setFeaturedImageAlt] = useState('')
+  const [ogImage, setOgImage] = useState('')
   const [seoTitle, setSeoTitle] = useState('')
   const [seoDescription, setSeoDescription] = useState('')
   const [canonicalUrl, setCanonicalUrl] = useState('')
@@ -128,6 +138,59 @@ export default function ArticleEditorPage() {
   const [categories, setCategories] = useState([])
   const [tags, setTags] = useState([])
   const [authors, setAuthors] = useState([])
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || initializing) {
+      return
+    }
+
+    const draftPayload = {
+      contentType,
+      title,
+      slug,
+      excerpt,
+      content,
+      categoryId,
+      selectedTags,
+      featuredImage,
+      featuredImageAlt,
+      ogImage,
+      seoTitle,
+      seoDescription,
+      canonicalUrl,
+      schemaType,
+      structuredData,
+      keywords,
+      status,
+      publishDate,
+      updatedDate,
+      selectedAuthorId,
+    }
+
+    window.localStorage.setItem(ARTICLE_DRAFT_STORAGE_KEY, JSON.stringify(draftPayload))
+  }, [
+    initializing,
+    contentType,
+    title,
+    slug,
+    excerpt,
+    content,
+    categoryId,
+    selectedTags,
+    featuredImage,
+    featuredImageAlt,
+    ogImage,
+    seoTitle,
+    seoDescription,
+    canonicalUrl,
+    schemaType,
+    structuredData,
+    keywords,
+    status,
+    publishDate,
+    updatedDate,
+    selectedAuthorId,
+  ])
 
   useEffect(() => {
     loadUserAndData()
@@ -206,11 +269,43 @@ export default function ArticleEditorPage() {
 
       const resolvedCategories = categoriesData || []
       const latestNewsCategory = findLatestNewsCategory(resolvedCategories)
+      const savedDraft = typeof window !== 'undefined'
+        ? window.localStorage.getItem(ARTICLE_DRAFT_STORAGE_KEY)
+        : null
+      let parsedDraft = null
+      if (savedDraft) {
+        try {
+          parsedDraft = JSON.parse(savedDraft)
+        } catch {
+          window.localStorage.removeItem(ARTICLE_DRAFT_STORAGE_KEY)
+        }
+      }
 
       setCategories(resolvedCategories)
       setTags(tagsData || [])
-      setSelectedAuthorId(authorData.id)
-      if (latestNewsCategory?.id) {
+      setSelectedAuthorId(parsedDraft?.selectedAuthorId || authorData.id)
+
+      if (parsedDraft) {
+        setContentType(parsedDraft.contentType || 'news')
+        setTitle(parsedDraft.title || '')
+        setSlug(parsedDraft.slug || '')
+        setExcerpt(parsedDraft.excerpt || '')
+        setContent(parsedDraft.content || { json: null, html: '' })
+        setCategoryId(parsedDraft.categoryId || latestNewsCategory?.id || '')
+        setSelectedTags(Array.isArray(parsedDraft.selectedTags) ? parsedDraft.selectedTags : [])
+        setFeaturedImage(parsedDraft.featuredImage || '')
+        setFeaturedImageAlt(parsedDraft.featuredImageAlt || '')
+        setOgImage(parsedDraft.ogImage || '')
+        setSeoTitle(parsedDraft.seoTitle || '')
+        setSeoDescription(parsedDraft.seoDescription || '')
+        setCanonicalUrl(parsedDraft.canonicalUrl || '')
+        setSchemaType(parsedDraft.schemaType || 'NewsArticle')
+        setStructuredData(parsedDraft.structuredData || '')
+        setKeywords(Array.isArray(parsedDraft.keywords) ? parsedDraft.keywords : [])
+        setStatus(parsedDraft.status || 'published')
+        setPublishDate(parsedDraft.publishDate || '')
+        setUpdatedDate(parsedDraft.updatedDate || '')
+      } else if (latestNewsCategory?.id) {
         setCategoryId(latestNewsCategory.id)
       }
       setInitializing(false)
@@ -373,6 +468,7 @@ export default function ArticleEditorPage() {
         category_id: categoryId || null,
         featured_image_url: featuredImage || null,
         featured_image_alt: featuredImageAlt?.trim() || null,
+        og_image: ogImage.trim() || null,
         seo_title: seoTitle || title,
         seo_description: seoDescription || excerpt,
         canonical_url: canonicalUrl.trim() || null,
@@ -429,6 +525,10 @@ export default function ArticleEditorPage() {
         title: 'Success',
         description: statusMessages[finalStatus] || 'Article created successfully',
       })
+
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(ARTICLE_DRAFT_STORAGE_KEY)
+      }
 
       router.push('/dashboard/articles')
     } catch (err) {
@@ -556,7 +656,13 @@ export default function ArticleEditorPage() {
           </CardContent>
         </Card>
 
-        <ArticlePublishingChecklist contentType={contentType} userRole={userRole} />
+        <ArticlePublishingChecklist
+          contentType={contentType}
+          userRole={userRole}
+          seoTitle={seoTitle}
+          seoDescription={seoDescription}
+          featuredImageAlt={featuredImageAlt}
+        />
 
         <>
             {/* Title */}
@@ -710,10 +816,12 @@ export default function ArticleEditorPage() {
               <Card>
                 <CardContent className="pt-6">
                   <div className="relative w-full h-48 rounded-lg overflow-hidden border">
-                    <img
+                    <Image
                       src={featuredImage}
                       alt={featuredImageAlt || title || 'Featured image'}
-                      className="w-full h-full object-cover"
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 1024px) 100vw, 896px"
                     />
                   </div>
                 </CardContent>
@@ -770,8 +878,8 @@ export default function ArticleEditorPage() {
                 value={seoTitle}
                 onChange={(e) => setSeoTitle(e.target.value)}
               />
-              <p className="text-xs text-gray-500 mt-1">
-                {seoTitle.length}/60 characters
+              <p className={getSeoCounterClassName(seoTitle.length, 50, 60)}>
+                {seoTitle.length} / 60 characters
               </p>
             </div>
             <div>
@@ -785,9 +893,17 @@ export default function ArticleEditorPage() {
                 rows={2}
                 className="resize-none"
               />
-              <p className="text-xs text-gray-500 mt-1">
-                {seoDescription.length}/160 characters
+              <p className={getSeoCounterClassName(seoDescription.length, 150, 160)}>
+                {seoDescription.length} / 160 characters
               </p>
+            </div>
+            <div>
+              <Label>Social Share Image (OG)</Label>
+              <Input
+                placeholder="Leave blank to use featured image"
+                value={ogImage}
+                onChange={(e) => setOgImage(e.target.value)}
+              />
             </div>
             <div>
               <Label>Canonical URL</Label>
@@ -936,11 +1052,19 @@ export default function ArticleEditorPage() {
                 </DialogHeader>
                 <div className="space-y-4">
                   {featuredImage && (
-                    <img src={featuredImage} alt={title} className="w-full h-64 object-cover rounded-lg" />
+                    <div className="relative h-64 w-full overflow-hidden rounded-lg">
+                      <Image
+                        src={featuredImage}
+                        alt={title || 'Preview image'}
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 1024px) 100vw, 896px"
+                      />
+                    </div>
                   )}
                   <h1 className="text-4xl font-bold text-gray-900 dark:text-white">{title}</h1>
                   <p className="text-xl text-gray-600 dark:text-gray-400">{excerpt}</p>
-                  <SafeHtml
+                  <SafeHtmlPreview
                     html={content.html}
                     className="prose dark:prose-invert max-w-none"
                     baseUrl={process.env.NEXT_PUBLIC_BASE_URL || 'https://www.ekahnews.com'}
@@ -953,5 +1077,3 @@ export default function ArticleEditorPage() {
     </div>
   )
 }
-
-

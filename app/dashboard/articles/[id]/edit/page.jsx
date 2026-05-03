@@ -12,7 +12,6 @@ import {
     getImageDimensions,
 } from '@/lib/image-utils'
 import TipTapEditor from '@/components/editor/TipTapEditor'
-import SafeHtml from '@/components/SafeHtml'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -37,6 +36,7 @@ import {
 import { X, Eye, Save, Trash2, AlertTriangle } from 'lucide-react'
 import { createSlug } from '@/lib/slug'
 import Link from 'next/link'
+import Image from 'next/image'
 
 function findLatestNewsCategory(categories = []) {
     return (
@@ -89,6 +89,12 @@ function RequiredLabel({ children }) {
     )
 }
 
+function getSeoCounterClassName(length, idealMin, idealMax) {
+    if (length > idealMax) return 'text-xs mt-1 text-red-600 dark:text-red-400'
+    if (length >= idealMin) return 'text-xs mt-1 text-emerald-600 dark:text-emerald-400'
+    return 'text-xs mt-1 text-gray-500 dark:text-gray-400'
+}
+
 export default function EditArticlePage() {
     const router = useRouter()
     const params = useParams()
@@ -114,6 +120,7 @@ export default function EditArticlePage() {
     const [selectedTags, setSelectedTags] = useState([])
     const [featuredImage, setFeaturedImage] = useState('')
     const [featuredImageAlt, setFeaturedImageAlt] = useState('')
+    const [ogImage, setOgImage] = useState('')
     const [seoTitle, setSeoTitle] = useState('')
     const [seoDescription, setSeoDescription] = useState('')
     const [canonicalUrl, setCanonicalUrl] = useState('')
@@ -192,6 +199,7 @@ export default function EditArticlePage() {
             setSelectedAuthorId(articleData.author_id || authorData?.id || '')
             setFeaturedImage(articleData.featured_image_url || '')
             setFeaturedImageAlt(articleData.featured_image_alt || '')
+            setOgImage(articleData.og_image || '')
             setSeoTitle(articleData.seo_title || '')
             setSeoDescription(articleData.seo_description || '')
             setCanonicalUrl(articleData.canonical_url || '')
@@ -397,6 +405,7 @@ export default function EditArticlePage() {
                 category_id: categoryId || null,
                 featured_image_url: featuredImage || null,
                 featured_image_alt: featuredImageAlt?.trim() || null,
+                og_image: ogImage.trim() || null,
                 seo_title: seoTitle || title,
                 seo_description: seoDescription || excerpt,
                 canonical_url: canonicalUrl.trim() || null,
@@ -561,7 +570,13 @@ export default function EditArticlePage() {
             </div>
 
             <div className="space-y-6">
-                <ArticlePublishingChecklist contentType={schemaType === 'BlogPosting' ? 'article' : 'news'} userRole={userRole} />
+                <ArticlePublishingChecklist
+                    contentType={schemaType === 'BlogPosting' ? 'article' : 'news'}
+                    userRole={userRole}
+                    seoTitle={seoTitle}
+                    seoDescription={seoDescription}
+                    featuredImageAlt={featuredImageAlt}
+                />
 
                 {/* Title */}
                 <Card>
@@ -714,10 +729,12 @@ export default function EditArticlePage() {
                         </p>
                         {featuredImage && (
                             <div className="mt-4 relative w-full h-48 rounded-lg overflow-hidden border">
-                                <img
+                                <Image
                                     src={featuredImage}
                                     alt={featuredImageAlt || title || 'Featured image'}
-                                    className="w-full h-full object-cover"
+                                    fill
+                                    className="object-cover"
+                                    sizes="(max-width: 1024px) 100vw, 896px"
                                 />
                             </div>
                         )}
@@ -774,8 +791,8 @@ export default function EditArticlePage() {
                                 value={seoTitle}
                                 onChange={(e) => setSeoTitle(e.target.value)}
                             />
-                            <p className="text-xs text-gray-500 mt-1">
-                                {seoTitle.length}/60 characters
+                            <p className={getSeoCounterClassName(seoTitle.length, 50, 60)}>
+                                {seoTitle.length} / 60 characters
                             </p>
                         </div>
                         <div>
@@ -789,9 +806,17 @@ export default function EditArticlePage() {
                                 rows={2}
                                 className="resize-none"
                             />
-                            <p className="text-xs text-gray-500 mt-1">
-                                {seoDescription.length}/160 characters
+                            <p className={getSeoCounterClassName(seoDescription.length, 150, 160)}>
+                                {seoDescription.length} / 160 characters
                             </p>
+                        </div>
+                        <div>
+                            <Label>Social Share Image (OG)</Label>
+                            <Input
+                                placeholder="Leave blank to use featured image"
+                                value={ogImage}
+                                onChange={(e) => setOgImage(e.target.value)}
+                            />
                         </div>
                         <div>
                             <Label>Canonical URL</Label>
@@ -937,10 +962,6 @@ export default function EditArticlePage() {
         </div>
     )
 }
-
-
-
-
 
 
 

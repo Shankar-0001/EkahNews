@@ -19,9 +19,29 @@ const OPTIONAL_ITEMS = [
   'Tags and keywords help discovery, but they are not required for review/publish',
 ]
 
-export default function ArticlePublishingChecklist({ contentType = 'news', userRole = 'author' }) {
+export default function ArticlePublishingChecklist({
+  contentType = 'news',
+  userRole = 'author',
+  seoTitle = '',
+  seoDescription = '',
+  featuredImageAlt = '',
+}) {
   const contentLabel = contentType === 'article' ? 'article' : 'news story'
   const actionLabel = userRole === 'admin' ? 'publish' : 'submit for review'
+  const warningItems = [
+    {
+      label: 'Meta description added',
+      passed: seoDescription?.trim().length > 0,
+    },
+    {
+      label: 'Meta title within 60 characters',
+      passed: seoTitle?.trim().length > 0 && seoTitle.trim().length <= 60,
+    },
+    {
+      label: 'Featured image alt text added',
+      passed: featuredImageAlt?.trim().length > 0,
+    },
+  ]
 
   return (
     <Card className="border-amber-200 bg-amber-50/70">
@@ -42,6 +62,19 @@ export default function ArticlePublishingChecklist({ contentType = 'news', userR
             <div key={item} className="flex items-start gap-2 rounded-lg border border-amber-200 bg-white/70 px-3 py-2">
               <CheckCircle2 className="mt-0.5 h-4 w-4 text-emerald-600" />
               <span>{item}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid gap-2 md:grid-cols-2">
+          {warningItems.map((item) => (
+            <div key={item.label} className="flex items-start gap-2 rounded-lg border border-amber-200 bg-white/70 px-3 py-2">
+              {item.passed ? (
+                <CheckCircle2 className="mt-0.5 h-4 w-4 text-emerald-600" />
+              ) : (
+                <Info className="mt-0.5 h-4 w-4 text-amber-700" />
+              )}
+              <span>{item.label}</span>
             </div>
           ))}
         </div>

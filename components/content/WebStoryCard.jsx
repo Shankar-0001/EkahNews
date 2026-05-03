@@ -1,5 +1,5 @@
 import Image from 'next/image'
-import { formatDistanceToNowStrict } from 'date-fns'
+import { formatArticleCardDate } from '@/lib/date-utils'
 
 export default function WebStoryCard({ story }) {
   return (
@@ -22,7 +22,7 @@ export default function WebStoryCard({ story }) {
           </h3>
           {story.published_at && (
             <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-              {formatDistanceToNowStrict(new Date(story.published_at), { addSuffix: true })}
+              {formatArticleCardDate(story.published_at)}
             </p>
           )}
         </div>

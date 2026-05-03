@@ -26,6 +26,7 @@ export default function FooterPagesEditor() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  const [saveSuccessMessage, setSaveSuccessMessage] = useState('')
 
   const [title, setTitle] = useState('')
   const [seoTitle, setSeoTitle] = useState('')
@@ -61,6 +62,10 @@ export default function FooterPagesEditor() {
       json: current.content_json || null,
     })
   }, [pages, selectedSlug])
+
+  useEffect(() => {
+    setSaveSuccessMessage('')
+  }, [selectedSlug])
 
   const loadPages = async () => {
     try {
@@ -171,15 +176,6 @@ export default function FooterPagesEditor() {
 
   const handleSave = async () => {
     if (!selectedSlug) return
-    if (!title.trim()) {
-      toast({
-        variant: 'destructive',
-        title: 'Validation error',
-        description: 'Page title is required',
-      })
-      return
-    }
-
     if (!content.html || content.html.trim().length === 0) {
       toast({
         variant: 'destructive',
@@ -191,14 +187,18 @@ export default function FooterPagesEditor() {
 
     try {
       setSaving(true)
+      setSaveSuccessMessage('')
+      const resolvedTitle = title.trim() || currentPage?.title || currentPage?.label || 'Page'
+      const resolvedSeoTitle = seoTitle.trim() || currentPage?.seo_title || resolvedTitle
+      const resolvedSeoDescription = seoDescription.trim() || currentPage?.seo_description || ''
       const response = await fetch('/api/static-pages', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           slug: selectedSlug,
-          title: title.trim(),
-          seo_title: seoTitle.trim(),
-          seo_description: seoDescription.trim(),
+          title: resolvedTitle,
+          seo_title: resolvedSeoTitle,
+          seo_description: resolvedSeoDescription,
           content_html: content.html,
           content_json: content.json,
         }),
@@ -206,8 +206,8 @@ export default function FooterPagesEditor() {
       const result = await response.json()
       if (!response.ok) throw new Error(result?.error || 'Failed to update page')
 
-      const updatedPage = result?.data?.page
-      setPages((prev) => prev.map((page) => (page.slug === selectedSlug ? updatedPage : page)))
+      await loadPages()
+      setSaveSuccessMessage('Updated successfully')
 
       toast({
         title: 'Saved',
@@ -353,37 +353,19 @@ export default function FooterPagesEditor() {
           {currentPage && isEditable && (
             <>
               <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Page Settings</CardTitle>
-                </CardHeader>
                 <CardContent className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium text-gray-700">Page Title</label>
-                    <Input
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      placeholder="Page title"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-700">SEO Title</label>
-                    <Input
-                      value={seoTitle}
-                      onChange={(e) => setSeoTitle(e.target.value)}
-                      placeholder={currentPage.seo_title || 'SEO title'}
-                    />
-                    <p className="text-xs text-gray-500 mt-1">{seoTitle.length}/60 characters</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-700">SEO Description</label>
-                    <Textarea
-                      value={seoDescription}
-                      onChange={(e) => setSeoDescription(e.target.value)}
-                      placeholder={currentPage.seo_description || 'SEO description'}
-                      rows={2}
-                      className="resize-none"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">{seoDescription.length}/160 characters</p>
+                  <div className="flex flex-wrap items-center gap-2 pt-6">
+                    <Badge variant={currentPage.hasOverride ? 'secondary' : 'outline'}>
+                      {currentPage.hasOverride ? 'Edited' : 'Default content'}
+                    </Badge>
+                    {currentPage.updated_at && (
+                      <span className="text-xs text-gray-500">
+                        Last updated: {new Date(currentPage.updated_at).toLocaleString()}
+                      </span>
+                    )}
+                    {saveSuccessMessage && (
+                      <span className="text-xs font-medium text-emerald-600">{saveSuccessMessage}</span>
+                    )}
                   </div>
                 </CardContent>
               </Card>

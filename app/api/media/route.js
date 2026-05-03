@@ -8,6 +8,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { apiResponse } from '@/lib/api-utils'
 import { requireAuth } from '@/lib/auth-utils'
 import { validateFileUpload, sanitizeFilename } from '@/lib/security-utils'
+import { checkRateLimit, getClientIp } from '@/lib/request-guards'
 
 const MEDIA_SELECT = 'id, filename, file_url, file_path, file_type, file_size, original_width, original_height, uploaded_by, created_at'
 
@@ -94,7 +95,7 @@ export async function GET(request) {
         console.error('Media GET error:', error)
         return apiResponse(500, null, {
             message: 'Failed to fetch media',
-            error: error.message,
+            error: 'An internal error occurred',
         })
     }
 }
@@ -106,6 +107,30 @@ export async function GET(request) {
  */
 export async function POST(request) {
     try {
+        const rateResult = checkRateLimit({
+            key: `${getClientIp(request)}:media:upload`,
+            limit: 20,
+            windowMs: 60 * 1000,
+        })
+
+        if (!rateResult.allowed) {
+            return new Response(
+                JSON.stringify({
+                    success: false,
+                    status: 429,
+                    error: 'Too many media upload requests. Please try again shortly.',
+                    timestamp: new Date().toISOString(),
+                }),
+                {
+                    status: 429,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Retry-After': String(Math.max(1, Math.ceil((rateResult.resetAt - Date.now()) / 1000))),
+                    },
+                }
+            )
+        }
+
         const supabase = await createClient()
         const adminSupabase = (() => {
             try {
@@ -212,7 +237,7 @@ export async function POST(request) {
         console.error('Media POST error:', error)
         return apiResponse(500, null, {
             message: 'File upload failed',
-            error: error.message,
+            error: 'An internal error occurred',
         })
     }
 }
@@ -224,6 +249,30 @@ export async function POST(request) {
  */
 export async function DELETE(request) {
     try {
+        const rateResult = checkRateLimit({
+            key: `${getClientIp(request)}:media:delete`,
+            limit: 30,
+            windowMs: 60 * 1000,
+        })
+
+        if (!rateResult.allowed) {
+            return new Response(
+                JSON.stringify({
+                    success: false,
+                    status: 429,
+                    error: 'Too many media delete requests. Please try again shortly.',
+                    timestamp: new Date().toISOString(),
+                }),
+                {
+                    status: 429,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Retry-After': String(Math.max(1, Math.ceil((rateResult.resetAt - Date.now()) / 1000))),
+                    },
+                }
+            )
+        }
+
         const supabase = await createClient()
 
         // Check authentication
@@ -302,8 +351,7 @@ export async function DELETE(request) {
         console.error('Media DELETE error:', error)
         return apiResponse(500, null, {
             message: 'Failed to delete media',
-            error: error.message,
+            error: 'An internal error occurred',
         })
     }
 }
-

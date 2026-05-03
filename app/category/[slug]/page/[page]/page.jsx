@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createOptionalPublicClient } from '@/lib/supabase/public-server'
 import PublicHeader from '@/components/layout/PublicHeader'
 import Breadcrumb from '@/components/common/Breadcrumb'
 import ArticleMiniCard from '@/components/content/ArticleMiniCard'
@@ -6,11 +6,53 @@ import WebStoryCard from '@/components/content/WebStoryCard'
 import StructuredData from '@/components/seo/StructuredData'
 import { absoluteUrl, getPublicationLogoUrl } from '@/lib/site-config'
 import { notFound } from 'next/navigation'
+import Link from 'next/link'
 import Image from 'next/image'
-import { formatDistanceToNow } from 'date-fns'
+import { BLOCKED_CATEGORY_SLUGS, filterBlockedCategories } from '@/lib/category-utils'
+import { getBreadcrumbSchema } from '@/lib/schema'
+import { formatArticleCardDate } from '@/lib/date-utils'
 
 export const revalidate = 900
 const PAGE_SIZE = 12
+const WEB_STORY_CATEGORY_SLUGS = ['web-story', 'web-stories']
+
+function normalizeArticleItem(article) {
+  return {
+    ...article,
+    _type: 'article',
+  }
+}
+
+function normalizeWebStoryItem(story) {
+  return {
+    ...story,
+    _type: 'web_story',
+  }
+}
+
+function sortItemsByPublishedAt(items) {
+  return [...items].sort((a, b) => {
+    const left = new Date(a?.published_at || 0).getTime()
+    const right = new Date(b?.published_at || 0).getTime()
+    return right - left
+  })
+}
+
+function getContentHref(item) {
+  return item?._type === 'web_story'
+    ? `/web-stories/${item.slug}`
+    : `/${item.categories?.slug || 'news'}/${item.slug}`
+}
+
+function getContentImage(item) {
+  return item?._type === 'web_story' ? item.cover_image : item.featured_image_url
+}
+
+function getContentImageAlt(item) {
+  return item?._type === 'web_story'
+    ? (item.cover_image_alt || item.title || 'Web story cover')
+    : (item.title || 'Article image')
+}
 
 function toPageNumber(raw) {
   const page = Number.parseInt(raw, 10)
@@ -19,18 +61,22 @@ function toPageNumber(raw) {
 
 function NewsFeatureCard({ article, priority = false }) {
   if (!article) return null
+  const href = getContentHref(article)
+  const imageSrc = getContentImage(article)
+  const imageAlt = getContentImageAlt(article)
+  const isWebStory = article._type === 'web_story'
 
   return (
     <div className="space-y-3">
-      <a
-        href={`/${article.categories?.slug || 'news'}/${article.slug}`}
+      <Link
+        href={href}
         className="group block overflow-hidden"
       >
         <div className="relative aspect-[16/10] bg-slate-100 dark:bg-slate-800 sm:aspect-[16/9] lg:aspect-[16/10]">
-          {article.featured_image_url ? (
+          {imageSrc ? (
             <Image
-              src={article.featured_image_url}
-              alt={article.title}
+              src={imageSrc}
+              alt={imageAlt}
               fill
               priority={priority}
               className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
@@ -40,42 +86,57 @@ function NewsFeatureCard({ article, priority = false }) {
             <div className="h-full w-full" aria-hidden="true" />
           )}
         </div>
-      </a>
+      </Link>
 
-      <a
-        href={`/${article.categories?.slug || 'news'}/${article.slug}`}
+      <Link
+        href={href}
         className="group block px-1 py-2 transition-colors"
       >
-        <h1 className="line-clamp-3 text-[1.3rem] font-extrabold leading-tight tracking-tight text-slate-900 group-hover:underline group-hover:underline-offset-4 dark:text-white sm:text-[1.5rem] md:text-[1.75rem] lg:text-[1.9rem]">
+        {isWebStory ? (
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#d62828] dark:text-red-400">
+            Web Story
+          </p>
+        ) : null}
+        <h2 className="line-clamp-3 text-[1.3rem] font-extrabold leading-tight tracking-tight text-slate-900 group-hover:underline group-hover:underline-offset-4 dark:text-white sm:text-[1.5rem] md:text-[1.75rem] lg:text-[1.9rem]">
           {article.title}
-        </h1>
+        </h2>
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-600 dark:text-slate-400">
           {article.published_at ? (
-            <span>{formatDistanceToNow(new Date(article.published_at), { addSuffix: true })}</span>
+            <span>{formatArticleCardDate(article.published_at)}</span>
           ) : null}
           {article.authors?.name ? (
             <span>by {article.authors.name}</span>
           ) : null}
         </div>
-      </a>
+      </Link>
     </div>
   )
 }
 
 function NewsSidebarCard({ article }) {
+  const href = getContentHref(article)
+  const imageSrc = getContentImage(article)
+  const imageAlt = getContentImageAlt(article)
+  const isWebStory = article._type === 'web_story'
+
   return (
-    <a
+    <Link
       key={article.id}
-      href={`/${article.categories?.slug || 'news'}/${article.slug}`}
+      href={href}
       className="group grid min-w-0 grid-cols-[minmax(0,1fr)_72px] items-center gap-2 p-2 sm:grid-cols-[minmax(0,1fr)_80px] sm:p-2.5 lg:grid-cols-[minmax(0,1fr)_88px]"
     >
       <div className="min-w-0">
+        {isWebStory ? (
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#d62828] dark:text-red-400">
+            Web Story
+          </p>
+        ) : null}
         <p className="break-words text-[0.92rem] font-medium leading-snug text-slate-900 decoration-current underline-offset-4 group-hover:underline dark:text-white sm:text-[0.98rem]">
           {article.title}
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600 dark:text-slate-400 sm:text-sm">
           {article.published_at ? (
-            <span>{formatDistanceToNow(new Date(article.published_at), { addSuffix: true })}</span>
+            <span>{formatArticleCardDate(article.published_at)}</span>
           ) : null}
           {article.authors?.name ? (
             <span>by {article.authors.name}</span>
@@ -84,10 +145,10 @@ function NewsSidebarCard({ article }) {
       </div>
 
       <div className="relative h-[72px] w-[72px] overflow-hidden bg-slate-100 dark:bg-slate-800 sm:h-[80px] sm:w-[80px] lg:h-[88px] lg:w-[88px]">
-        {article.featured_image_url ? (
+        {imageSrc ? (
           <Image
-            src={article.featured_image_url}
-            alt={article.title}
+            src={imageSrc}
+            alt={imageAlt}
             fill
             className="object-cover"
             sizes="(max-width: 639px) 72px, (max-width: 1023px) 80px, 88px"
@@ -98,12 +159,31 @@ function NewsSidebarCard({ article }) {
           </div>
         )}
       </div>
-    </a>
+    </Link>
   )
 }
 
 export async function generateMetadata({ params }) {
-  const supabase = await createClient()
+  if (BLOCKED_CATEGORY_SLUGS.includes(params.slug)) {
+    return {
+      title: 'Category Not Found',
+      robots: {
+        index: false,
+        follow: false,
+      },
+    }
+  }
+
+  const supabase = createOptionalPublicClient()
+  if (!supabase) {
+    return {
+      title: 'Category Not Found | EkahNews',
+      robots: {
+        index: false,
+        follow: false,
+      },
+    }
+  }
   const page = toPageNumber(params.page)
 
   const { data: category } = await supabase
@@ -153,7 +233,14 @@ export async function generateMetadata({ params }) {
 }
 
 export default async function CategoryPagePaginated({ params }) {
-  const supabase = await createClient()
+  if (BLOCKED_CATEGORY_SLUGS.includes(params.slug)) {
+    notFound()
+  }
+
+  const supabase = createOptionalPublicClient()
+  if (!supabase) {
+    notFound()
+  }
   const page = toPageNumber(params.page)
   const from = (page - 1) * PAGE_SIZE
   const to = from + PAGE_SIZE - 1
@@ -168,44 +255,46 @@ export default async function CategoryPagePaginated({ params }) {
     notFound()
   }
 
-  const isWebStoryCategory = ['web-story', 'web-stories'].includes(category.slug)
+  const isWebStoryCategory = WEB_STORY_CATEGORY_SLUGS.includes(category.slug)
 
-  const itemsQuery = isWebStoryCategory
-    ? supabase
+  const [{ data: categories }, articlesResult, webStoriesResult] = await Promise.all([
+    supabase.from('categories').select('id, name, slug').order('name'),
+    isWebStoryCategory
+      ? Promise.resolve({ data: [], count: 0 })
+      : supabase
+        .from('articles')
+        .select('id, title, slug, excerpt, featured_image_url, published_at, categories(name, slug), authors(name)', { count: 'exact' })
+        .eq('category_id', category.id)
+        .eq('status', 'published')
+        .order('published_at', { ascending: false })
+        .range(0, to),
+    supabase
       .from('web_stories')
       .select('id, title, slug, cover_image, cover_image_alt, published_at, categories(name, slug), authors(name)', { count: 'exact' })
       .eq('category_id', category.id)
       .eq('status', 'published')
       .order('published_at', { ascending: false })
-      .range(from, to)
-    : supabase
-      .from('articles')
-      .select('id, title, slug, excerpt, featured_image_url, published_at, categories(name, slug), authors(name)', { count: 'exact' })
-      .eq('category_id', category.id)
-      .eq('status', 'published')
-      .order('published_at', { ascending: false })
-      .range(from, to)
-
-  const [{ data: categories }, { data: items, count }, { data: engagementRows }] = await Promise.all([
-    supabase.from('categories').select('id, name, slug').order('name'),
-    itemsQuery,
-    supabase.from('article_engagement').select('article_id, views, likes, shares').limit(10),
+      .range(0, isWebStoryCategory ? to : Math.max(to, PAGE_SIZE * 2 - 1)),
   ])
+  const filteredCategories = filterBlockedCategories(categories || [])
 
-  const totalPages = Math.max(1, Math.ceil((count || 0) / PAGE_SIZE))
+  const totalCount = isWebStoryCategory
+    ? (webStoriesResult?.count || 0)
+    : (articlesResult?.count || 0) + (webStoriesResult?.count || 0)
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
   if (page > totalPages && totalPages > 0) {
     notFound()
   }
 
-  const scoreMap = new Map((engagementRows || []).map((row) => [row.article_id, (row.views || 0) + (row.likes || 0) * 3 + (row.shares || 0) * 5]))
-  const latestArticles = items || []
-  const trending = [...latestArticles]
-    .map((item) => ({ ...item, _score: scoreMap.get(item.id) || 0 }))
-    .sort((a, b) => b._score - a._score)
+  const articleItems = isWebStoryCategory ? [] : (articlesResult?.data || []).map(normalizeArticleItem)
+  const webStoryItems = (webStoriesResult?.data || []).map(normalizeWebStoryItem)
+  const latestItems = isWebStoryCategory
+    ? webStoryItems.slice(from, to + 1)
+    : sortItemsByPublishedAt([...articleItems, ...webStoryItems]).slice(from, to + 1)
 
-  const featuredArticle = isWebStoryCategory ? latestArticles[0] : latestArticles[0] || trending[0]
-  const sidebarStories = isWebStoryCategory ? [] : latestArticles.slice(1, 5)
-  const gridStories = isWebStoryCategory ? latestArticles.slice(1) : latestArticles.slice(5)
+  const featuredArticle = latestItems[0]
+  const sidebarStories = latestItems.slice(1, 5)
+  const gridStories = latestItems.slice(5)
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -213,21 +302,25 @@ export default async function CategoryPagePaginated({ params }) {
     name: `${category.name} News`,
     url: absoluteUrl(`/category/${category.slug}/page/${page}`),
   }
+  const breadcrumbSchema = getBreadcrumbSchema([
+    { name: 'Home', url: absoluteUrl('/') },
+    { name: category.name, url: absoluteUrl(`/category/${category.slug}`) },
+  ])
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <StructuredData data={jsonLd} />
-      <PublicHeader categories={categories || []} />
+      <StructuredData data={breadcrumbSchema} />
+      <PublicHeader categories={filteredCategories} />
 
       <main className="mx-auto w-full max-w-6xl px-4 py-10">
         <div className="mb-6">
           <Breadcrumb items={[{ label: category.name, href: '/category/' + category.slug }, { label: 'Page ' + page, href: '/category/' + category.slug + '/page/' + page }]} />
         </div>
-
         {featuredArticle ? (
           isWebStoryCategory ? (
             <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-6">
-              {latestArticles.map((story) => (
+              {latestItems.map((story) => (
                 <WebStoryCard key={story.id} story={story} />
               ))}
             </div>
@@ -247,8 +340,10 @@ export default async function CategoryPagePaginated({ params }) {
 
               {gridStories.length > 0 ? (
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                  {gridStories.map((article) => (
-                    <ArticleMiniCard key={article.id} article={article} compact hideExcerpt squareImage />
+                  {gridStories.map((item) => (
+                    item._type === 'web_story'
+                      ? <WebStoryCard key={`story-${item.id}`} story={item} />
+                      : <ArticleMiniCard key={`article-${item.id}`} article={item} compact hideExcerpt squareImage />
                   ))}
                 </div>
               ) : null}
@@ -263,9 +358,9 @@ export default async function CategoryPagePaginated({ params }) {
         {totalPages > 1 && (
           <div className="mt-10 flex items-center justify-between text-sm">
             {page > 1 ? (
-              <a href={`/category/${category.slug}/page/${page - 1}`} className="text-blue-600 hover:underline">
+              <Link href={`/category/${category.slug}/page/${page - 1}`} className="text-blue-600 hover:underline">
                 Previous
-              </a>
+              </Link>
             ) : (
               <span className="text-gray-400">Previous</span>
             )}
@@ -273,9 +368,9 @@ export default async function CategoryPagePaginated({ params }) {
             <span className="text-gray-600 dark:text-gray-400">Page {page} of {totalPages}</span>
 
             {page < totalPages ? (
-              <a href={`/category/${category.slug}/page/${page + 1}`} className="text-blue-600 hover:underline">
+              <Link href={`/category/${category.slug}/page/${page + 1}`} className="text-blue-600 hover:underline">
                 Next
-              </a>
+              </Link>
             ) : (
               <span className="text-gray-400">Next</span>
             )}

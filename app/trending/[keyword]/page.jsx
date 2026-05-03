@@ -7,6 +7,7 @@ import { absoluteUrl, buildLanguageAlternates, slugFromText } from '@/lib/site-c
 import { notFound, permanentRedirect } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
+import { filterBlockedCategories } from '@/lib/category-utils'
 
 export const revalidate = 900
 const MIN_MATCH_COUNT = 3
@@ -146,6 +147,7 @@ export default async function TrendingKeywordPage({ params }) {
 
   const trendKeyword = requestedTrend || (trendRows || []).find((row) => row.slug === normalizedRequested)
   const relatedByKeyword = matchedArticles || []
+  const filteredCategories = filterBlockedCategories(categories || [])
 
   if (!trendKeyword && relatedByKeyword.length < MIN_MATCH_COUNT) {
     notFound()
@@ -205,7 +207,7 @@ export default async function TrendingKeywordPage({ params }) {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <StructuredData data={jsonLd} />
-      <PublicHeader categories={categories || []} />
+      <PublicHeader categories={filteredCategories} />
 
       <main className="w-full max-w-6xl mx-auto px-4 py-10 md:py-14">
         <section className="mb-10 overflow-hidden rounded-xl border dark:border-gray-700 bg-white dark:bg-gray-800">

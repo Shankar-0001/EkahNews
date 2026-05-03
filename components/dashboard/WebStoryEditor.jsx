@@ -12,9 +12,10 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import KeywordInput from '@/components/dashboard/KeywordInput'
+import TagInput from '@/components/dashboard/TagInput'
 import { useToast } from '@/hooks/use-toast'
 
-const MIN_CONTENT_SLIDES = 4
+const MIN_CONTENT_SLIDES = 1
 const RECOMMENDED_TITLE_LIMIT = 70
 const HARD_TITLE_LIMIT = 90
 const RECOMMENDED_SLIDE_TEXT_LIMIT = 180
@@ -33,7 +34,7 @@ function normalizeContentSlides(slides = []) {
   const regularSlides = (slides || []).filter((slide) => !slide?.cta_url && !slide?.whatsapp_group_url)
   return regularSlides.length > 0
     ? regularSlides.map((slide) => ({ media_type: slide?.media_type === 'video' ? 'video' : 'image', image: slide?.image || '', image_alt: slide?.image_alt || '', video: slide?.video || '', video_duration: Number(slide?.video_duration) || null, description: slide?.description || '' }))
-    : [emptyContentSlide(), emptyContentSlide(), emptyContentSlide(), emptyContentSlide()]
+    : [emptyContentSlide()]
 }
 
 function normalizeReadMoreSlide(slides = []) {
@@ -298,6 +299,7 @@ export default function WebStoryEditor({ mode = 'create', storyId = null }) {
   const [bootstrapping, setBootstrapping] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [categories, setCategories] = useState([])
+  const [tags, setTags] = useState([])
   const [authors, setAuthors] = useState([])
   const [userRole, setUserRole] = useState('author')
 
@@ -312,13 +314,13 @@ export default function WebStoryEditor({ mode = 'create', storyId = null }) {
   const [categoryId, setCategoryId] = useState('')
   const [authorId, setAuthorId] = useState('')
   const [relatedArticleSlug, setRelatedArticleSlug] = useState('')
-  const [tagsText, setTagsText] = useState('')
+  const [selectedTags, setSelectedTags] = useState([])
   const [keywords, setKeywords] = useState([])
   const [status, setStatus] = useState('draft')
   const [publishDate, setPublishDate] = useState('')
   const [updatedDate, setUpdatedDate] = useState('')
   const [adSlot, setAdSlot] = useState('')
-  const [contentSlides, setContentSlides] = useState([emptyContentSlide(), emptyContentSlide(), emptyContentSlide(), emptyContentSlide()])
+  const [contentSlides, setContentSlides] = useState([emptyContentSlide()])
   const [readMoreSlide, setReadMoreSlide] = useState(emptyCtaSlide())
   const [whatsappSlide, setWhatsappSlide] = useState(emptyCtaSlide())
 
@@ -331,14 +333,16 @@ export default function WebStoryEditor({ mode = 'create', storyId = null }) {
           return
         }
 
-        const [{ data: userRow }, { data: categoryRows }] = await Promise.all([
+        const [{ data: userRow }, { data: categoryRows }, { data: tagRows }] = await Promise.all([
           supabase.from('users').select('role').eq('id', authData.user.id).single(),
           supabase.from('categories').select('id, name').order('name'),
+          supabase.from('tags').select('id, name, slug').order('name'),
         ])
 
         const nextRole = userRow?.role || 'author'
         setUserRole(nextRole)
         setCategories(categoryRows || [])
+        setTags(tagRows || [])
 
         if (nextRole === 'admin') {
           const { data: authorRows } = await supabase.from('authors').select('id, name').order('name')
@@ -370,7 +374,7 @@ export default function WebStoryEditor({ mode = 'create', storyId = null }) {
           setCategoryId(story.category_id || '')
           setAuthorId(story.author_id || '')
           setRelatedArticleSlug(story.related_article_slug || '')
-          setTagsText(Array.isArray(story.tags) ? story.tags.join(', ') : '')
+          setSelectedTags((story.web_story_tags || []).map((entry) => entry.tag_id).filter(Boolean))
           setKeywords(Array.isArray(story.keywords) ? story.keywords : [])
           setStatus(story.status || 'draft')
           setPublishDate(toDateTimeLocal(story.published_at))
@@ -414,6 +418,34 @@ export default function WebStoryEditor({ mode = 'create', storyId = null }) {
       clone[nextIndex] = temp
       return clone
     })
+  }
+
+  const createTag = async (rawName) => {
+    const name = rawName.trim()
+    if (!name) return null
+
+    const response = await fetch('/api/articles/tags', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    })
+    const result = await response.json().catch(() => ({}))
+
+    if (response.ok && result?.data?.tag) {
+      const createdTag = result.data.tag
+      setTags((prev) => {
+        if (prev.some((tag) => tag.id === createdTag.id)) return prev
+        return [...prev, createdTag].sort((a, b) => a.name.localeCompare(b.name))
+      })
+      return createdTag
+    }
+
+    toast({
+      variant: 'destructive',
+      title: 'Tag creation failed',
+      description: result?.error || 'Could not create tag',
+    })
+    return null
   }
 
   const uploadMedia = async (file) => {
@@ -487,7 +519,6 @@ export default function WebStoryEditor({ mode = 'create', storyId = null }) {
     const normalizedTitle = title.trim()
     const normalizedSlideHeadline = truncateText(normalizedTitle, HARD_TITLE_LIMIT)
     const normalizedSlug = slugFromText(slug || normalizedTitle || 'web-story')
-    const trimmedTags = tagsText.split(',').map((tag) => tag.trim()).filter(Boolean)
     const preparedContentSlides = contentSlides
       .map((slide) => ({
         media_type: slide.media_type === 'video' ? 'video' : 'image',
@@ -516,9 +547,21 @@ export default function WebStoryEditor({ mode = 'create', storyId = null }) {
 
     const fallbackImage = coverImage || preparedContentSlides[0]?.image || ""
     const fallbackAlt = coverImageAlt || normalizedTitle
+    const hasReadMoreSlide = Boolean(
+      (readMoreSlide.image || fallbackImage)
+      && (readMoreSlide.description?.trim() || readMoreSlide.cta_text?.trim() || readMoreSlide.cta_url?.trim())
+    )
+    const hasWhatsappSlide = Boolean(
+      whatsappSlide.whatsapp_group_url?.trim()
+      || (
+        (whatsappSlide.image || fallbackImage)
+        && whatsappSlide.description?.trim()
+      )
+    )
+
     const finalSlides = [
       ...preparedContentSlides,
-      {
+      ...(hasReadMoreSlide ? [{
         media_type: 'image',
         image: readMoreSlide.image || fallbackImage,
         image_alt: readMoreSlide.image_alt || fallbackAlt,
@@ -530,8 +573,8 @@ export default function WebStoryEditor({ mode = 'create', storyId = null }) {
         cta_url: readMoreSlide.cta_url || '',
         whatsapp_group_url: '',
         seo_description: '',
-      },
-      {
+      }] : []),
+      ...(hasWhatsappSlide ? [{
         media_type: 'image',
         image: whatsappSlide.image || fallbackImage,
         image_alt: whatsappSlide.image_alt || fallbackAlt,
@@ -543,7 +586,7 @@ export default function WebStoryEditor({ mode = 'create', storyId = null }) {
         cta_url: '',
         whatsapp_group_url: whatsappSlide.whatsapp_group_url || "",
         seo_description: '',
-      },
+      }] : []),
     ].filter((slide) => slide.image || slide.video)
 
     const normalizedCategoryId = normalizeSelectedId(categoryId)
@@ -564,7 +607,7 @@ export default function WebStoryEditor({ mode = 'create', storyId = null }) {
         category_id: normalizedCategoryId || null,
         author_id: normalizedAuthorId || null,
         related_article_slug: relatedArticleSlug.trim() || null,
-        tags: trimmedTags,
+        tags: selectedTags,
         keywords,
         status,
         published_at: publishDate || null,
@@ -707,9 +750,15 @@ export default function WebStoryEditor({ mode = 'create', storyId = null }) {
                 <Input id="related_article_slug" value={relatedArticleSlug} onChange={(e) => setRelatedArticleSlug(e.target.value)} placeholder="optional-related-article-slug" />
               </div>
 
-              <div>
-                <RequiredLabel htmlFor="story_tags">Tags</RequiredLabel>
-                <Input id="story_tags" value={tagsText} onChange={(e) => setTagsText(e.target.value)} placeholder="news, latest, update" />
+              <div className="md:col-span-2">
+                <TagInput
+                  label="Tags"
+                  tags={tags}
+                  value={selectedTags}
+                  onChange={setSelectedTags}
+                  onCreateTag={createTag}
+                  description="Type a tag and press Enter to add it. Both admins and authors can create missing tags here."
+                />
               </div>
 
               <div>
@@ -876,7 +925,4 @@ export default function WebStoryEditor({ mode = 'create', storyId = null }) {
     </div>
   )
 }
-
-
-
 

@@ -4,6 +4,7 @@ import PublicHeader from '@/components/layout/PublicHeader'
 import StructuredData from '@/components/seo/StructuredData'
 import { absoluteUrl, getPublicationContactInfo, getPublicationSocialProfiles } from '@/lib/site-config'
 import { getRenderableHtml, getStaticPageDefinition, getStaticPageOverride } from '@/lib/static-pages'
+import { filterBlockedCategories } from '@/lib/category-utils'
 
 export async function generateMetadata() {
   const definition = getStaticPageDefinition('about-us')
@@ -14,6 +15,9 @@ export async function generateMetadata() {
     description: override?.seo_description
       || definition?.seoDescription
       || 'Learn about EkahNews, our newsroom values, and our commitment to responsible journalism.',
+    alternates: {
+      canonical: absoluteUrl('/about-us'),
+    },
   }
 }
 
@@ -23,6 +27,7 @@ export default async function AboutUsPage() {
     .from('categories')
     .select('id, name, slug')
     .order('name')
+  const filteredCategories = filterBlockedCategories(categories || [])
 
   const override = await getStaticPageOverride('about-us')
   const pageTitle = override?.title || 'About EkahNews'
@@ -51,16 +56,15 @@ export default async function AboutUsPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <StructuredData data={schema} />
-      <PublicHeader categories={categories || []} />
+      <PublicHeader categories={filteredCategories} />
       <main className="w-full max-w-6xl mx-auto px-4 py-10">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{pageTitle}</h1>
         {contentHtml ? (
           <SafeHtml
             html={contentHtml}
-            className="mt-6 prose prose-slate dark:prose-invert max-w-none"
+            className="static-page-content max-w-none"
           />
         ) : (
-          <div className="mt-6 space-y-4 text-gray-700 dark:text-gray-300">
+          <div className="space-y-4 text-gray-700 dark:text-gray-300">
             <p>
               EkahNews delivers timely, reliable coverage across major categories with a focus on clarity, context, and
               public value. Our newsroom prioritizes accuracy, transparency, and reader trust.
@@ -74,28 +78,7 @@ export default async function AboutUsPage() {
             </p>
           </div>
         )}
-        <section className="mt-10 grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Editorial Standards</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
-              We prioritize verification, clear sourcing, and meaningful updates when facts change.
-            </p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Reader Contact</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
-              {contact.editorialEmail || contact.email || 'Use the contact page to reach our newsroom and support team.'}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Public Presence</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
-              {socialProfiles.length > 0 ? `${socialProfiles.length} official social profile${socialProfiles.length > 1 ? 's are' : ' is'} configured.` : 'Official social profiles can be added through environment configuration.'}
-            </p>
-          </div>
-        </section>
       </main>
     </div>
   )
 }
-

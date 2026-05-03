@@ -4,6 +4,7 @@ import ArticleMiniCard from '@/components/content/ArticleMiniCard'
 import StructuredData from '@/components/seo/StructuredData'
 import { absoluteUrl, getPublicationLogoUrl, slugFromText } from '@/lib/site-config'
 import { notFound, permanentRedirect } from 'next/navigation'
+import { filterBlockedCategories } from '@/lib/category-utils'
 
 export const revalidate = 900
 const MIN_MATCH_COUNT = 3
@@ -135,6 +136,7 @@ export default async function TopicPage({ params }) {
     articlesQuery,
     supabase.from('article_engagement').select('article_id, views, likes, shares').limit(10),
   ])
+  const filteredCategories = filterBlockedCategories(categories || [])
 
   const matched = articles || []
   const isThinTopic = matched.length < MIN_MATCH_COUNT
@@ -165,7 +167,7 @@ export default async function TopicPage({ params }) {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <StructuredData data={jsonLd} />
-      <PublicHeader categories={categories || []} />
+      <PublicHeader categories={filteredCategories} />
 
       <main className="w-full max-w-6xl mx-auto px-4 py-10">
         <div className="mb-8">
@@ -188,4 +190,3 @@ export default async function TopicPage({ params }) {
     </div>
   )
 }
-

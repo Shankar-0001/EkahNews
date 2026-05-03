@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { apiResponse } from '@/lib/api-utils'
 import { requireRequestAuth } from '@/lib/auth-utils'
+import { revalidatePath } from 'next/cache'
 
 // DELETE - Delete all tags for an article
 export async function DELETE(request, { params }) {
@@ -16,7 +17,7 @@ export async function DELETE(request, { params }) {
 
         const { data: article, error: articleError } = await admin
             .from('articles')
-            .select('author_id')
+            .select('author_id, slug, categories(slug)')
             .eq('id', articleId)
             .single()
 
@@ -44,6 +45,11 @@ export async function DELETE(request, { params }) {
             }
         }
 
+        const { data: existingTags } = await admin
+            .from('article_tags')
+            .select('tags(slug)')
+            .eq('article_id', articleId)
+
         const { error } = await admin
             .from('article_tags')
             .delete()
@@ -53,10 +59,19 @@ export async function DELETE(request, { params }) {
             return apiResponse(500, null, error.message)
         }
 
+        revalidatePath('/sitemap.xml')
+        if (article?.slug) {
+            revalidatePath(`/${article.categories?.slug || 'news'}/${article.slug}`)
+        }
+        for (const entry of existingTags || []) {
+            if (entry?.tags?.slug) {
+                revalidatePath(`/tags/${entry.tags.slug}`)
+            }
+        }
+
         return apiResponse(200, { deleted: true }, null)
     } catch (error) {
         console.error('[API] Error deleting article tags:', error)
-        return apiResponse(500, null, error.message)
+        return apiResponse(500, null, 'An internal error occurred')
     }
 }
-
