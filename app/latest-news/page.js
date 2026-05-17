@@ -2,6 +2,7 @@ import { createOptionalPublicClient } from '@/lib/supabase/public-server'
 import PublicHeader from '@/components/layout/PublicHeader'
 import LatestFeedList from '@/components/content/LatestFeedList'
 import { getLatestFeedPage } from '@/lib/latest-feed'
+import { runListQuery } from '@/lib/supabase/query-timeout'
 
 const LATEST_FEED_PAGE_SIZE = 12
 
@@ -36,10 +37,14 @@ export default async function LatestNewsPage() {
   if (supabase) {
     try {
       const [categoriesRes, latestFeed] = await Promise.all([
-        supabase
-          .from('categories')
-          .select('id, name, slug')
-          .order('name'),
+        runListQuery(
+          (signal) => supabase
+            .from('categories')
+            .select('id, name, slug')
+            .order('name')
+            .abortSignal(signal),
+          { label: 'latestNews:getCategories' }
+        ),
         getLatestFeedPage(supabase, { page: 1, pageSize: LATEST_FEED_PAGE_SIZE }),
       ])
 
@@ -61,6 +66,10 @@ export default async function LatestNewsPage() {
             initialItems={feedItems}
             initialHasMore={hasMore}
             pageSize={LATEST_FEED_PAGE_SIZE}
+            initialPage={1}
+            enableInfiniteScroll
+            paginationBasePath="/latest-news"
+            showPaginationNav
           />
         ) : (
           <section className="border border-slate-200 bg-white p-6 text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">

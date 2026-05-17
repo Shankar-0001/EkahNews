@@ -1,6 +1,7 @@
 import { createOptionalPublicClient } from '@/lib/supabase/public-server'
 import { absoluteUrl } from '@/lib/site-config'
 import { urlsetXml, xmlResponse } from '@/lib/sitemap-utils'
+import { runListQuery } from '@/lib/supabase/query-timeout'
 
 const MAX_URLS = 50000
 const MIN_MATCH_COUNT = 3
@@ -53,16 +54,24 @@ export async function GET() {
   const publishedAfterIso = new Date(Date.now() - ARTICLE_LOOKBACK_DAYS * 24 * 60 * 60 * 1000).toISOString()
 
   const [{ data: trendRows }, { data: articleRows }] = await Promise.all([
-    supabase
-      .from('trending_topics')
-      .select('slug, updated_at')
-      .order('updated_at', { ascending: false })
-      .limit(MAX_URLS),
-    supabase
-      .from('articles')
-      .select('title, excerpt')
-      .eq('status', 'published')
-      .gte('published_at', publishedAfterIso),
+    runListQuery(
+      (signal) => supabase
+        .from('trending_topics')
+        .select('slug, updated_at')
+        .order('updated_at', { ascending: false })
+        .limit(MAX_URLS)
+        .abortSignal(signal),
+      { label: 'topicSitemap:trends' }
+    ),
+    runListQuery(
+      (signal) => supabase
+        .from('articles')
+        .select('title, excerpt')
+        .eq('status', 'published')
+        .gte('published_at', publishedAfterIso)
+        .abortSignal(signal),
+      { label: 'topicSitemap:articles' }
+    ),
   ])
 
   const phraseCountMap = buildPhraseCountMap(articleRows || [])
@@ -83,4 +92,3 @@ export async function GET() {
 
   return xmlResponse(urlsetXml(entries))
 }
-

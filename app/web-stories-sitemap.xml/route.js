@@ -1,15 +1,20 @@
 import { createClient } from '@/lib/supabase/server'
 import { absoluteUrl } from '@/lib/site-config'
 import { urlsetXml, xmlResponse } from '@/lib/sitemap-utils'
+import { runListQuery } from '@/lib/supabase/query-timeout'
 
 export async function GET() {
   const supabase = await createClient()
-  const { data: stories } = await supabase
-    .from('web_stories')
-    .select('slug, published_at, updated_at')
-    .eq('status', 'published')
-    .order('published_at', { ascending: false })
-    .limit(5000)
+  const { data: stories } = await runListQuery(
+    (signal) => supabase
+      .from('web_stories')
+      .select('slug, published_at, updated_at')
+      .eq('status', 'published')
+      .order('published_at', { ascending: false })
+      .limit(5000)
+      .abortSignal(signal),
+    { label: 'webStoriesSitemap:stories' }
+  )
 
   const entries = (stories || []).map((story) => ({
     loc: absoluteUrl(`/web-stories/${story.slug}`),

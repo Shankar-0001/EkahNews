@@ -1,9 +1,9 @@
 import { createOptionalPublicClient } from '@/lib/supabase/public-server'
+import dynamic from 'next/dynamic'
 import { notFound, permanentRedirect } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Calendar, Clock } from 'lucide-react'
-import { format, formatDistanceToNow } from 'date-fns'
+import { format } from 'date-fns'
 import Link from 'next/link'
 import Image from 'next/image'
 import PublicHeader from '@/components/layout/PublicHeader'
@@ -11,10 +11,6 @@ import StructuredData from '@/components/seo/StructuredData'
 import { SidebarAd } from '@/components/ads/AdComponent'
 import { buildArticleImageVariants, generateArticleSchemas } from '@/lib/seo-utils'
 import { calculateReadingTime, generateSixtySecondSummary } from '@/lib/content-utils'
-import ReadingProgressBar from '@/components/article/ReadingProgressBar'
-import ArticleSummaryToggles from '@/components/article/ArticleSummaryToggles'
-import ArticleFollowStrip from '@/components/article/ArticleFollowStrip'
-import ContinuousReader from '@/components/article/ContinuousReader'
 import DynamicRelatedSidebar from '@/components/article/DynamicRelatedSidebar'
 import Breadcrumb from '@/components/common/Breadcrumb'
 import SafeHtml from '@/components/SafeHtml'
@@ -26,6 +22,11 @@ import { getBreadcrumbSchema, getFAQSchema, getNewsArticleSchema, getSpeakableSc
 import { filterBlockedCategories } from '@/lib/category-utils'
 import { runListQuery, runSingleQuery } from '@/lib/supabase/query-timeout'
 import { getAdSlotIds, hasRenderableAdSlot } from '@/lib/ads'
+
+const ReadingProgressBar = dynamic(() => import('@/components/article/ReadingProgressBar'), { ssr: false })
+const ArticleSummaryToggles = dynamic(() => import('@/components/article/ArticleSummaryToggles'), { ssr: false })
+const ArticleFollowStrip = dynamic(() => import('@/components/article/ArticleFollowStrip'), { ssr: false })
+const ContinuousReader = dynamic(() => import('@/components/article/ContinuousReader'), { ssr: false })
 
 export const revalidate = 1800
 
@@ -152,6 +153,7 @@ export async function generateMetadata({ params }) {
     if (!article) {
       return {
         title: 'Article Not Found',
+        robots: { index: false, follow: false },
       }
     }
 
@@ -229,6 +231,7 @@ export async function generateMetadata({ params }) {
   } catch {
     return {
       title: 'Article - EkahNews',
+      robots: { index: false, follow: false },
     }
   }
 }

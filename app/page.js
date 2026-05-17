@@ -35,6 +35,7 @@ const FOR_YOU_CATEGORIES = [
   { label: 'Sports', sourceSlug: 'sports' },
   { label: 'Technology', sourceSlug: 'technology' },
 ]
+const FOR_YOU_ARTICLES_PER_CATEGORY = 3
 
 const siteUrl = SITE_URL
 const ogImage = getPublicationLogoUrl()
@@ -328,7 +329,7 @@ export default async function HomePage() {
       for (const article of forYouArticles || []) {
         if (!article.category_id) continue
         const items = articlesByCategoryId.get(article.category_id) || []
-        if (items.length < 2) {
+        if (items.length < FOR_YOU_ARTICLES_PER_CATEGORY) {
           items.push(article)
           articlesByCategoryId.set(article.category_id, items)
         }
@@ -509,14 +510,12 @@ export default async function HomePage() {
             <div className="grid w-full gap-3 xl:grid-cols-[minmax(0,1.42fr)_minmax(260px,0.58fr)] xl:items-stretch">
               {forYouCards.length > 0 && (
                 <div className="h-full overflow-hidden border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                  <div className="grid h-full md:grid-cols-2 md:divide-x md:divide-slate-200 dark:md:divide-slate-800">
+                  <div className="grid h-full gap-x-6 gap-y-2 md:grid-cols-2">
                     {forYouCards.map((item, index) => {
-                      const isLastRow = index >= forYouCards.length - 2
-
                       return (
                         <div
                           key={`${item.label}-${index}`}
-                          className={`${!isLastRow ? 'border-b border-slate-200 dark:border-slate-800' : ''} py-2 ${index % 2 === 0 ? 'md:pr-3' : 'md:pl-3'}`}
+                          className={`py-2 ${index % 2 === 0 ? 'md:pr-1' : 'md:pl-1'}`}
                         >
                           <div className="min-w-0">
                             <Link

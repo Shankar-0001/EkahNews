@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createOptionalPublicClient } from '@/lib/supabase/public-server'
 import { getArticleCanonicalUrl } from '@/lib/site-config'
 import { isBlockedCategorySlug } from '@/lib/category-utils'
+import { runListQuery } from '@/lib/supabase/query-timeout'
 
 export const revalidate = 300
 
@@ -17,33 +18,37 @@ function escapeXml(value) {
     .replace(/'/g, '&apos;')
 }
 
+function buildEmptyNewsSitemap(cacheControl = 'public, s-maxage=300, stale-while-revalidate=600') {
+  return new NextResponse(
+    '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9"></urlset>',
+    {
+      headers: {
+        'Content-Type': 'application/xml; charset=utf-8',
+        'Cache-Control': cacheControl,
+      },
+    }
+  )
+}
+
 export async function GET() {
   const supabase = createOptionalPublicClient()
   if (!supabase) {
-    return new NextResponse(
-      '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9"></urlset>',
-      {
-        headers: {
-          'Content-Type': 'application/xml; charset=utf-8',
-          'Cache-Control': 'no-store, max-age=0',
-        },
-      }
-    )
+    return buildEmptyNewsSitemap('no-store, max-age=0')
   }
 
   const cutoffIso = new Date(Date.now() - NEWS_WINDOW_MS).toISOString()
 
-  const { data: articles, error } = await supabase
-    .from('articles')
-    .select('slug, title, canonical_url, published_at, categories(slug)')
-    .eq('status', 'published')
-    .gte('published_at', cutoffIso)
-    .order('published_at', { ascending: false })
-    .limit(MAX_URLS)
-
-  if (error) {
-    return new NextResponse('Failed to generate news sitemap', { status: 500 })
-  }
+  const { data: articles } = await runListQuery(
+    (signal) => supabase
+      .from('articles')
+      .select('slug, title, canonical_url, published_at, categories(slug)')
+      .eq('status', 'published')
+      .gte('published_at', cutoffIso)
+      .order('published_at', { ascending: false })
+      .limit(MAX_URLS)
+      .abortSignal(signal),
+    { label: 'newsSitemap:articles' }
+  )
 
   const seenUrls = new Set()
   const urls = (articles || [])
@@ -75,7 +80,7 @@ export async function GET() {
     .join('')
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset
+  <urlset
   xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
   xmlns:news="http://www.google.com/schemas/sitemap-news/0.9"
 >${urls}

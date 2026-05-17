@@ -2,13 +2,18 @@ import { createClient } from '@/lib/supabase/server'
 import { absoluteUrl } from '@/lib/site-config'
 import { urlsetXml, xmlResponse } from '@/lib/sitemap-utils'
 import { filterBlockedCategories } from '@/lib/category-utils'
+import { runListQuery } from '@/lib/supabase/query-timeout'
 
 export async function GET() {
   const supabase = await createClient()
-  const { data: categories } = await supabase
-    .from('categories')
-    .select('slug, updated_at')
-    .order('name')
+  const { data: categories } = await runListQuery(
+    (signal) => supabase
+      .from('categories')
+      .select('slug, updated_at')
+      .order('name')
+      .abortSignal(signal),
+    { label: 'categorySitemap:categories' }
+  )
 
   const entries = filterBlockedCategories(categories || []).map((c) => ({
     loc: absoluteUrl(`/category/${c.slug}`),

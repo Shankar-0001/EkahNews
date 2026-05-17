@@ -4,26 +4,35 @@ import ArticleMiniCard from '@/components/content/ArticleMiniCard'
 import WebStoryCard from '@/components/content/WebStoryCard'
 import StructuredData from '@/components/seo/StructuredData'
 import { absoluteUrl, getPublicationLogoUrl } from '@/lib/site-config'
-import { notFound } from 'next/navigation'
+import { notFound, permanentRedirect } from 'next/navigation'
 import { filterBlockedCategories } from '@/lib/category-utils'
 import { getBreadcrumbSchema } from '@/lib/schema'
 import Link from 'next/link'
+import { runListQuery, runSingleQuery } from '@/lib/supabase/query-timeout'
 
 export const revalidate = 900
 const PAGE_SIZE = 20
 
 async function getPublishedTagContentCount(supabase, tagId) {
   const [{ count: articleCount }, { count: webStoryCount }] = await Promise.all([
-    supabase
-      .from('articles')
-      .select('id, article_tags!inner(tag_id)', { count: 'exact', head: true })
-      .eq('status', 'published')
-      .eq('article_tags.tag_id', tagId),
-    supabase
-      .from('web_stories')
-      .select('id, web_story_tags!inner(tag_id)', { count: 'exact', head: true })
-      .eq('status', 'published')
-      .eq('web_story_tags.tag_id', tagId),
+    runListQuery(
+      (signal) => supabase
+        .from('articles')
+        .select('id, article_tags!inner(tag_id)', { count: 'exact', head: true })
+        .eq('status', 'published')
+        .eq('article_tags.tag_id', tagId)
+        .abortSignal(signal),
+      { label: `tagPageMetadata:${tagId}:articleCount` }
+    ),
+    runListQuery(
+      (signal) => supabase
+        .from('web_stories')
+        .select('id, web_story_tags!inner(tag_id)', { count: 'exact', head: true })
+        .eq('status', 'published')
+        .eq('web_story_tags.tag_id', tagId)
+        .abortSignal(signal),
+      { label: `tagPageMetadata:${tagId}:webStoryCount` }
+    ),
   ])
 
   return (articleCount || 0) + (webStoryCount || 0)
@@ -49,11 +58,15 @@ export async function generateMetadata({ params }) {
   const slug = decodeURIComponent(params.slug)
   const page = toPageNumber(params.page)
 
-  const { data: tag } = await supabase
-    .from('tags')
-    .select('id, name, slug')
-    .eq('slug', slug)
-    .maybeSingle()
+  const tag = await runSingleQuery(
+    (signal) => supabase
+      .from('tags')
+      .select('id, name, slug')
+      .eq('slug', slug)
+      .maybeSingle()
+      .abortSignal(signal),
+    { label: `tagPageMetadata:${slug}:tag` }
+  )
 
   if (!tag) {
     return {
@@ -76,7 +89,7 @@ export async function generateMetadata({ params }) {
     description,
     alternates: { canonical },
     robots: {
-      index: (count || 0) >= 3,
+      index: page <= 1 && (count || 0) >= 3,
       follow: true,
     },
     openGraph: {
@@ -99,6 +112,9 @@ export default async function TagPagePaginated({ params }) {
   const supabase = await createClient()
   const slug = decodeURIComponent(params.slug)
   const page = toPageNumber(params.page)
+  if (page <= 1) {
+    permanentRedirect(`/tags/${slug}`)
+  }
   const from = (page - 1) * PAGE_SIZE
   const to = from + PAGE_SIZE - 1
 

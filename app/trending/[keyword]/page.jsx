@@ -8,6 +8,7 @@ import { notFound, permanentRedirect } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { filterBlockedCategories } from '@/lib/category-utils'
+import { runListQuery, runSingleQuery } from '@/lib/supabase/query-timeout'
 
 export const revalidate = 900
 const MIN_MATCH_COUNT = 3
@@ -57,19 +58,27 @@ export async function generateMetadata({ params }) {
     }
   }
   const pattern = keywordPattern(keyword)
-  const [{ data: trendRow }, { count }] = await Promise.all([
-    supabase
-      .from('trending_topics')
-      .select('slug')
-      .eq('slug', normalized)
-      .maybeSingle(),
+  const [trendRow, { count }] = await Promise.all([
+    runSingleQuery(
+      (signal) => supabase
+        .from('trending_topics')
+        .select('slug')
+        .eq('slug', normalized)
+        .maybeSingle()
+        .abortSignal(signal),
+      { label: `trendingMetadata:${normalized}:trend` }
+    ),
     pattern
-      ? supabase
-        .from('articles')
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'published')
-        .or(`title.ilike.${pattern},excerpt.ilike.${pattern}`)
-      : Promise.resolve({ count: 0 }),
+      ? runListQuery(
+        (signal) => supabase
+          .from('articles')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'published')
+          .or(`title.ilike.${pattern},excerpt.ilike.${pattern}`)
+          .abortSignal(signal),
+        { label: `trendingMetadata:${normalized}:matchCount` }
+      )
+      : Promise.resolve({ count: 0, data: [] }),
   ])
 
   const indexable = !!trendRow && (count || 0) >= MIN_MATCH_COUNT

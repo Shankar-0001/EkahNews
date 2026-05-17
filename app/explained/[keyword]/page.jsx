@@ -7,6 +7,7 @@ import { notFound, permanentRedirect } from 'next/navigation'
 import { stripHtml } from '@/lib/content-utils'
 import Link from 'next/link'
 import { filterBlockedCategories } from '@/lib/category-utils'
+import { runListQuery } from '@/lib/supabase/query-timeout'
 
 export const revalidate = 1200
 const MIN_MATCH_COUNT = 3
@@ -59,11 +60,15 @@ export async function generateMetadata({ params }) {
   const pattern = keywordPattern(keyword)
   let matchCount = 0
   if (pattern) {
-    const { count } = await supabase
-      .from('articles')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'published')
-      .or(`title.ilike.${pattern},excerpt.ilike.${pattern}`)
+    const { count } = await runListQuery(
+      (signal) => supabase
+        .from('articles')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'published')
+        .or(`title.ilike.${pattern},excerpt.ilike.${pattern}`)
+        .abortSignal(signal),
+      { label: `explainedMetadata:${normalized}:matchCount` }
+    )
     matchCount = count || 0
   }
 

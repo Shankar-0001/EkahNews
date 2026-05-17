@@ -18,7 +18,6 @@ export default function robots() {
           '/author-panel/',
           '/login',
           '/signup',
-          '/_next/',
           '/category/eijfjka',
           '/category/kdfjskfj',
           '/category/skdfjoisk',

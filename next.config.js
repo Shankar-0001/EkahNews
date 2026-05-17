@@ -1,15 +1,41 @@
+const fs = require('fs')
+const path = require('path')
+
+function findPolyfillsChunkTarget() {
+  try {
+    const chunkDir = path.join(process.cwd(), '.next', 'static', 'chunks')
+    const entry = fs
+      .readdirSync(chunkDir)
+      .find((name) => /^polyfills-[^.]+\.js$/.test(name))
+
+    return entry
+      ? `/_next/static/chunks/${entry}`
+      : '/next-polyfills-fallback.js'
+  } catch {
+    return '/next-polyfills-fallback.js'
+  }
+}
+
 function buildCsp() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
   const supabaseOrigin = supabaseUrl ? new URL(supabaseUrl).origin : ''
+  const supabaseWsOrigin = supabaseOrigin
+    ? supabaseOrigin.replace(/^https/, 'wss').replace(/^http/, 'ws')
+    : ''
   const isDev = process.env.NODE_ENV !== 'production'
   const connectSrc = [
     "'self'",
     supabaseOrigin,
+    supabaseWsOrigin,
     'https://cdn.ampproject.org',
+    'https://*.ampproject.org',
     'https://analytics.google.com',
     'https://www.google-analytics.com',
     'https://*.google-analytics.com',
     'https://*.analytics.google.com',
+    'https://*.google.com',
+    'https://*.gstatic.com',
+    'https://*.googleadservices.com',
     'https://googletagmanager.com',
     'https://www.googletagmanager.com',
     'https://*.googletagmanager.com',
@@ -17,7 +43,9 @@ function buildCsp() {
     'https://www.google.com',
     'https://ampcid.google.com',
     'https://pagead2.googlesyndication.com',
+    'https://*.googlesyndication.com',
     'https://stats.g.doubleclick.net',
+    'https://*.doubleclick.net',
     'https://*.g.doubleclick.net',
     'https://googleads.g.doubleclick.net',
     isDev ? 'http://localhost:3000' : '',
@@ -99,6 +127,16 @@ const nextConfig = {
   onDemandEntries: {
     maxInactiveAge: 10000,
     pagesBufferLength: 2,
+  },
+  async rewrites() {
+    return {
+      beforeFiles: [
+        {
+          source: '/_next/static/chunks/polyfills.js',
+          destination: findPolyfillsChunkTarget(),
+        },
+      ],
+    }
   },
   async headers() {
     const headers = [

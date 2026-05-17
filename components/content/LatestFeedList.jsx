@@ -145,9 +145,13 @@ export default function LatestFeedList({
   initialItems = [],
   initialHasMore = false,
   pageSize = DEFAULT_PAGE_SIZE,
+  initialPage = 1,
+  enableInfiniteScroll = true,
+  paginationBasePath = '/latest-news',
+  showPaginationNav = false,
 }) {
   const [items, setItems] = useState(initialItems)
-  const [currentPage, setCurrentPage] = useState(1)
+  const [currentPage, setCurrentPage] = useState(initialPage)
   const [hasMore, setHasMore] = useState(initialHasMore)
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
@@ -212,7 +216,7 @@ export default function LatestFeedList({
   }, [items])
 
   useEffect(() => {
-    if (!sentinelRef.current || !hasMore) return
+    if (!enableInfiniteScroll || !sentinelRef.current || !hasMore) return
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -228,11 +232,16 @@ export default function LatestFeedList({
 
     observer.observe(sentinelRef.current)
     return () => observer.disconnect()
-  }, [hasMore, loadNextPage])
+  }, [enableInfiniteScroll, hasMore, loadNextPage])
 
   if (items.length === 0) {
     return null
   }
+
+  const previousPageHref = currentPage <= 2
+    ? paginationBasePath
+    : `${paginationBasePath}/page/${currentPage - 1}`
+  const nextPageHref = `${paginationBasePath}/page/${currentPage + 1}`
 
   return (
     <section className="space-y-4">
@@ -253,12 +262,34 @@ export default function LatestFeedList({
         </div>
       )}
 
-      {hasMore && (
+      {hasMore && enableInfiniteScroll && (
         <div ref={sentinelRef} className="flex justify-center py-4" aria-hidden="true">
           <div className="text-sm text-slate-500 dark:text-slate-400">
             {loading ? 'Loading more stories...' : 'Scroll for more'}
           </div>
         </div>
+      )}
+
+      {showPaginationNav && (
+        <nav className="mt-6 flex items-center justify-between text-sm" aria-label="Latest news pagination">
+          {currentPage > 1 ? (
+            <Link href={previousPageHref} className="text-blue-600 hover:underline">
+              Previous
+            </Link>
+          ) : (
+            <span className="text-slate-400">Previous</span>
+          )}
+
+          <span className="text-slate-600 dark:text-slate-400">Page {currentPage}</span>
+
+          {hasMore ? (
+            <Link href={nextPageHref} className="text-blue-600 hover:underline">
+              Next
+            </Link>
+          ) : (
+            <span className="text-slate-400">Next</span>
+          )}
+        </nav>
       )}
     </section>
   )

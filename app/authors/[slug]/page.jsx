@@ -14,36 +14,47 @@ import SchemaScript from '@/components/seo/SchemaScript'
 import AuthorAvatar from '@/components/common/AuthorAvatar'
 import { getPersonSchema } from '@/lib/schema'
 import { filterBlockedCategories } from '@/lib/category-utils'
+import { runListQuery, runSingleQuery } from '@/lib/supabase/query-timeout'
 
 async function findAuthorBySlug(rawSlug) {
   const supabase = await createClient()
   const alternateSlug = rawSlug?.startsWith('@') ? rawSlug.slice(1) : `@${rawSlug}`
   const nameCandidate = rawSlug?.replace(/-/g, ' ')
 
-  let { data: author } = await supabase
-    .from('authors')
-    .select('id, slug, name, bio, avatar_url, title, social_links')
-    .or(`slug.eq.${rawSlug},slug.eq.${alternateSlug},id.eq.${rawSlug}`)
-    .maybeSingle()
-
-  if (!author && nameCandidate) {
-    const { data: nameMatch } = await supabase
+  let author = await runSingleQuery(
+    (signal) => supabase
       .from('authors')
       .select('id, slug, name, bio, avatar_url, title, social_links')
-      .ilike('name', `%${nameCandidate}%`)
-      .limit(1)
+      .or(`slug.eq.${rawSlug},slug.eq.${alternateSlug},id.eq.${rawSlug}`)
       .maybeSingle()
-    author = nameMatch
+      .abortSignal(signal),
+    { label: `authorMetadata:${rawSlug}:primaryLookup` }
+  )
+
+  if (!author && nameCandidate) {
+    author = await runSingleQuery(
+      (signal) => supabase
+        .from('authors')
+        .select('id, slug, name, bio, avatar_url, title, social_links')
+        .ilike('name', `%${nameCandidate}%`)
+        .limit(1)
+        .maybeSingle()
+        .abortSignal(signal),
+      { label: `authorMetadata:${rawSlug}:nameLookup` }
+    )
   }
 
   if (!author && rawSlug) {
-    const { data: emailMatch } = await supabase
-      .from('authors')
-      .select('id, slug, name, bio, avatar_url, title, social_links')
-      .ilike('email', `${rawSlug}@%`)
-      .limit(1)
-      .maybeSingle()
-    author = emailMatch
+    author = await runSingleQuery(
+      (signal) => supabase
+        .from('authors')
+        .select('id, slug, name, bio, avatar_url, title, social_links')
+        .ilike('email', `${rawSlug}@%`)
+        .limit(1)
+        .maybeSingle()
+        .abortSignal(signal),
+      { label: `authorMetadata:${rawSlug}:emailLookup` }
+    )
   }
 
   return author || null
@@ -51,21 +62,29 @@ async function findAuthorBySlug(rawSlug) {
 
 async function countPublishedArticles(authorId) {
   const supabase = await createClient()
-  const { count } = await supabase
-    .from('articles')
-    .select('id', { count: 'exact', head: true })
-    .eq('author_id', authorId)
-    .eq('status', 'published')
+  const { count } = await runListQuery(
+    (signal) => supabase
+      .from('articles')
+      .select('id', { count: 'exact', head: true })
+      .eq('author_id', authorId)
+      .eq('status', 'published')
+      .abortSignal(signal),
+    { label: `authorMetadata:${authorId}:primaryArticleCount` }
+  )
 
   if ((count || 0) > 0) {
     return count || 0
   }
 
-  const { count: fallbackCount } = await supabase
-    .from('articles')
-    .select('id, authors!inner(id)', { count: 'exact', head: true })
-    .eq('status', 'published')
-    .eq('authors.id', authorId)
+  const { count: fallbackCount } = await runListQuery(
+    (signal) => supabase
+      .from('articles')
+      .select('id, authors!inner(id)', { count: 'exact', head: true })
+      .eq('status', 'published')
+      .eq('authors.id', authorId)
+      .abortSignal(signal),
+    { label: `authorMetadata:${authorId}:fallbackArticleCount` }
+  )
 
   return fallbackCount || 0
 }

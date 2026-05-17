@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { getArticleCanonicalUrl } from '@/lib/site-config'
 import { urlsetXml, xmlResponse } from '@/lib/sitemap-utils'
+import { runListQuery } from '@/lib/supabase/query-timeout'
 
 const PAGE_SIZE = 5000
 
@@ -15,12 +16,16 @@ export async function GET(_request, context) {
   const from = (page - 1) * PAGE_SIZE
   const to = from + PAGE_SIZE - 1
 
-  const { data: rows } = await supabase
-    .from('articles')
-    .select('slug, canonical_url, updated_at, published_at, categories(slug)')
-    .eq('status', 'published')
-    .order('published_at', { ascending: false })
-    .range(from, to)
+  const { data: rows } = await runListQuery(
+    (signal) => supabase
+      .from('articles')
+      .select('slug, canonical_url, updated_at, published_at, categories(slug)')
+      .eq('status', 'published')
+      .order('published_at', { ascending: false })
+      .range(from, to)
+      .abortSignal(signal),
+    { label: `articleSitemapPage:${page}:articles` }
+  )
 
   const entries = (rows || []).map((article) => ({
     loc: absoluteUrl(`/${article.categories?.slug || 'news'}/${article.slug}`),
@@ -31,4 +36,3 @@ export async function GET(_request, context) {
 
   return xmlResponse(urlsetXml(entries))
 }
-

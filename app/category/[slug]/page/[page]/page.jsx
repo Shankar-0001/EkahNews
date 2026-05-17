@@ -5,12 +5,13 @@ import ArticleMiniCard from '@/components/content/ArticleMiniCard'
 import WebStoryCard from '@/components/content/WebStoryCard'
 import StructuredData from '@/components/seo/StructuredData'
 import { absoluteUrl, getPublicationLogoUrl } from '@/lib/site-config'
-import { notFound } from 'next/navigation'
+import { notFound, permanentRedirect } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { BLOCKED_CATEGORY_SLUGS, filterBlockedCategories } from '@/lib/category-utils'
 import { getBreadcrumbSchema } from '@/lib/schema'
 import { formatArticleCardDate } from '@/lib/date-utils'
+import { runSingleQuery } from '@/lib/supabase/query-timeout'
 
 export const revalidate = 900
 const PAGE_SIZE = 12
@@ -186,11 +187,15 @@ export async function generateMetadata({ params }) {
   }
   const page = toPageNumber(params.page)
 
-  const { data: category } = await supabase
-    .from('categories')
-    .select('name, slug, description')
-    .eq('slug', params.slug)
-    .single()
+  const category = await runSingleQuery(
+    (signal) => supabase
+      .from('categories')
+      .select('name, slug, description')
+      .eq('slug', params.slug)
+      .maybeSingle()
+      .abortSignal(signal),
+    { label: `categoryPageMetadata:${params.slug}:category` }
+  )
 
   if (!category) {
     return {
@@ -199,8 +204,12 @@ export async function generateMetadata({ params }) {
     }
   }
 
-  const canonical = absoluteUrl(`/category/${category.slug}/page/${page}`)
-  const title = `${category.name} News and Updates | Page ${page} | EkahNews`
+  const canonical = page <= 1
+    ? absoluteUrl(`/category/${category.slug}`)
+    : absoluteUrl(`/category/${category.slug}/page/${page}`)
+  const title = page <= 1
+    ? `${category.name} News and Updates | EkahNews`
+    : `${category.name} News and Updates | Page ${page} | EkahNews`
   const description = category.description
     || `Latest ${category.name} news, updates, and analysis on EkahNews.`
   const ogImage = getPublicationLogoUrl()
@@ -210,7 +219,7 @@ export async function generateMetadata({ params }) {
     description,
     alternates: { canonical },
     robots: {
-      index: true,
+      index: page <= 1,
       follow: true,
       'max-image-preview': 'large',
       'max-snippet': -1,
@@ -242,6 +251,9 @@ export default async function CategoryPagePaginated({ params }) {
     notFound()
   }
   const page = toPageNumber(params.page)
+  if (page <= 1) {
+    permanentRedirect(`/category/${params.slug}`)
+  }
   const from = (page - 1) * PAGE_SIZE
   const to = from + PAGE_SIZE - 1
 
