@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
-import { ChevronRight, Facebook, Plus, Share2 } from 'lucide-react'
+import { ChevronRight, Facebook, Share2 } from 'lucide-react'
 import { absoluteUrl } from '@/lib/site-config'
 import { getAnchorPropsForHref } from '@/lib/link-policy'
 
@@ -40,9 +40,6 @@ export default function ArticleFollowStrip({ articleUrl, articleTitle }) {
     facebook: process.env.NEXT_PUBLIC_FACEBOOK_URL || '',
     twitter: process.env.NEXT_PUBLIC_TWITTER_URL || '',
   }), [])
-
-  const followHref = socialLinks.facebook || socialLinks.twitter || absoluteUrl('/about-us')
-
   const shareTargets = [
     {
       href: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
@@ -85,17 +82,6 @@ export default function ArticleFollowStrip({ articleUrl, articleTitle }) {
         </span>
         <ChevronRight className="h-4 w-4 shrink-0" />
       </a>
-
-      <a
-        href={followHref}
-        {...getAnchorPropsForHref(followHref, { nofollowExternal: false })}
-        className="inline-flex h-[40px] w-[110px] items-center justify-between gap-2 rounded-xl border-2 border-slate-300 bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
-        aria-label="Follow EkahNews on our official social profile"
-      >
-        <span className="truncate">Follow us</span>
-        <Plus className="h-3.5 w-3.5 shrink-0" />
-      </a>
-
       {shareTargets.map((target) => (
         <a
           key={target.label}

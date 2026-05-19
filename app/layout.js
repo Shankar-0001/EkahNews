@@ -72,6 +72,10 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <link rel="preconnect" href="https://www.google-analytics.com" />
+        <link rel="dns-prefetch" href="https://www.google-analytics.com" />
+      </head>
       <body className="font-sans">
         <SchemaScript schema={[getOrganizationSchema(), getWebSiteSchema()]} />
         <OptionalGlobalScripts />

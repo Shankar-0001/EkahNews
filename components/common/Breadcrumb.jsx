@@ -14,12 +14,12 @@ export default function Breadcrumb({ items }) {
   return (
     <>
       <StructuredData data={BreadcrumbSchema(schemaItems)} />
-      <nav className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400 mb-6">
+      <nav className="mb-6 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-600 dark:text-gray-400 sm:text-sm">
         <Link href="/" aria-label="Go to homepage" className="hover:text-blue-600 dark:hover:text-blue-400">
           <Home className="h-4 w-4" />
         </Link>
         {items.map((item, index) => (
-          <div key={index} className="flex items-center space-x-2">
+          <div key={index} className="flex items-center gap-x-2">
             <ChevronRight className="h-4 w-4" />
             {index === items.length - 1 ? (
               <span className="font-medium text-gray-900 dark:text-gray-100">{item.label}</span>

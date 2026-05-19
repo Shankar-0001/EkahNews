@@ -69,9 +69,11 @@ function SectionHeading({ kicker, title, href, hrefLabel = 'Load More' }) {
   return (
     <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
-          {kicker}
-        </p>
+        {kicker ? (
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
+            {kicker}
+          </p>
+        ) : null}
         <h2 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white md:text-3xl">
           {title}
         </h2>
@@ -489,6 +491,7 @@ export default async function HomePage() {
               <div className="mt-4 flex justify-center">
                 <Link
                   href="/latest-news"
+                  aria-label="Read more latest news"
                   className="inline-flex items-center justify-center border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-900 transition-colors hover:border-[#b4235a] hover:text-[#b4235a] dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:border-[#d94b7d] dark:hover:text-[#d94b7d]"
                 >
                   Read More
@@ -595,18 +598,18 @@ export default async function HomePage() {
                       href={getArticleHref(article)}
                       className="group flex gap-2 p-1.5 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800"
                     >
-                      <span className="mt-1 text-lg font-black text-slate-300 dark:text-slate-600">
+                      <span className="mt-1 text-lg font-black text-slate-400 dark:text-slate-500">
                         {String(index + 1).padStart(2, '0')}
                       </span>
                       <div className="min-w-0">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
                           {article.categories?.name || 'News'}
                         </p>
-                        <h3 className="mt-1 text-sm font-semibold leading-6 text-slate-900 line-clamp-3 dark:text-white">
+                        <h2 className="mt-1 text-sm font-semibold leading-6 text-slate-900 line-clamp-3 dark:text-white">
                           <span className="group-hover:underline group-hover:underline-offset-4">
                             {article.title}
                           </span>
-                        </h3>
+                        </h2>
                       </div>
                     </Link>
                   ))}
@@ -628,6 +631,7 @@ export default async function HomePage() {
               <div className="mt-4 flex justify-center">
                 <Link
                   href="/web-stories"
+                  aria-label="Read more web stories"
                   className="inline-flex items-center justify-center border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-900 transition-colors hover:border-[#b4235a] hover:text-[#b4235a] dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:border-[#d94b7d] dark:hover:text-[#d94b7d]"
                 >
                   Read More
@@ -685,7 +689,7 @@ export default async function HomePage() {
                           </div>
                         </div>
 
-                        <div className="relative h-[72px] w-[72px] overflow-hidden rounded-2xl bg-slate-100 dark:bg-slate-800">
+                        <div className="relative h-[72px] w-[72px] overflow-hidden bg-slate-100 dark:bg-slate-800">
                           {article.featured_image_url ? (
                             <Image
                               src={article.featured_image_url}
@@ -709,9 +713,8 @@ export default async function HomePage() {
           </section>
 
           {moreNewsArticles.length > 0 && (
-            <section className="pb-4">
+            <section>
               <SectionHeading
-                kicker="More Coverage"
                 title="More News"
               />
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -721,6 +724,8 @@ export default async function HomePage() {
                     article={article}
                     compact
                     hideExcerpt={index > 3}
+                    squareImage
+                    squareCorners
                   />
                 ))}
               </div>

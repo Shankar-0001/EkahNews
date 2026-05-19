@@ -4,19 +4,20 @@ import { Card } from '@/components/ui/card'
 import { Clock3 } from 'lucide-react'
 import { formatArticleCardDate } from '@/lib/date-utils'
 
-export default function ArticleMiniCard({ article, compact = false, hideAuthor = false, hideExcerpt = false, imagePriority = false, squareImage = false }) {
+export default function ArticleMiniCard({ article, compact = false, hideAuthor = false, hideExcerpt = false, imagePriority = false, squareImage = false, squareCorners = false }) {
   const href = `/${article.categories?.slug || 'news'}/${article.slug}`
   const authorName = article.authors?.name
   const imageAspectClass = squareImage ? 'aspect-square' : compact ? 'aspect-[4/3]' : 'aspect-[16/10]'
+  const cardRadiusClass = squareCorners ? 'rounded-none' : 'rounded-[22px]'
   const imageSizes = squareImage
     ? '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw'
     : compact
-      ? '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw'
+      ? '(max-width: 640px) 382px, (max-width: 1024px) 50vw, 33vw'
       : '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw'
 
   return (
     <Link href={href} className="block h-full">
-      <Card className="h-full overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 dark:bg-slate-900">
+      <Card className={`h-full overflow-hidden border border-slate-200 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 ${cardRadiusClass}`}>
         {article.featured_image_url && (
           <div className={`relative w-full overflow-hidden bg-slate-100 dark:bg-slate-800 ${imageAspectClass}`}>
             <Image
