@@ -69,11 +69,11 @@ export default function ArticleFollowStrip({ articleUrl, articleTitle }) {
   }
 
   return (
-    <div className="ml-auto flex flex-wrap items-stretch gap-3 lg:flex-nowrap lg:shrink-0">
+    <div className="flex w-full flex-nowrap items-stretch gap-3 sm:ml-auto sm:w-auto sm:justify-start lg:shrink-0">
       <a
         href={googleNewsUrl}
         {...getAnchorPropsForHref(googleNewsUrl, { nofollowExternal: false })}
-        className="inline-flex h-[40px] w-[190px] items-center justify-between gap-2 rounded-xl border-2 border-black bg-black px-4 py-2 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90"
+        className="inline-flex h-[40px] min-w-0 flex-1 items-center justify-between gap-2 rounded-xl border-2 border-black bg-black px-4 py-2 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 sm:w-[190px] sm:flex-none"
         aria-label="Find EkahNews on Google News"
       >
         <span className="inline-flex items-center gap-3">

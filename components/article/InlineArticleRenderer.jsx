@@ -54,15 +54,15 @@ export default function InlineArticleRenderer({ article }) {
             </p>
           )}
 
-          <div className="mt-4 flex flex-wrap items-center gap-3 p-0 text-sm text-slate-600 dark:text-slate-400 md:gap-4 mb-4">
-            <div className="flex min-w-0 flex-1 items-center gap-2.5 sm:min-w-[220px]">
+          <div className="mt-4 mb-4 flex flex-col gap-3 p-0 text-sm text-slate-600 dark:text-slate-400 sm:flex-row sm:flex-wrap sm:items-center md:gap-4">
+            <div className="flex min-w-0 w-full items-center gap-2.5 sm:min-w-[220px] sm:flex-1">
               <Avatar className="h-11 w-11">
                 <AvatarImage src={article.authors?.avatar_url || ''} />
                 <AvatarFallback>
                   {(article.authors?.name || '').split(' ').map((name) => name[0]).join('')}
                 </AvatarFallback>
               </Avatar>
-              <div className="flex flex-col">
+              <div className="min-w-0 flex flex-col">
                 <Link href={`/authors/${authorLinkSlug}`} className="font-semibold text-slate-900 hover:text-[#d62828] hover:underline dark:text-white dark:hover:text-red-400">
                   {article.authors?.name || 'EkahNews'}
                 </Link>
