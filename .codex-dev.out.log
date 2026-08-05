@@ -1,0 +1,35 @@
+
+> nextjs-mongo-template@0.1.0 dev
+> next dev --hostname 0.0.0.0 --port 3000
+
+  ▲ Next.js 14.2.35
+  - Local:        http://localhost:3000
+  - Network:      http://0.0.0.0:3000
+  - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 3.1s
+ ✓ Compiled /middleware in 411ms (123 modules)
+ ○ Compiling / ...
+ ✓ Compiled / in 4.3s (860 modules)
+ ✓ Compiled in 640ms (364 modules)
+ GET / 200 in 14945ms
+ GET / 200 in 8525ms
+ ○ Compiling /manifest.webmanifest ...
+ ✓ Compiled /manifest.webmanifest in 1011ms (531 modules)
+ GET /manifest.webmanifest 200 in 1514ms
+ GET / 200 in 11065ms
+ GET /manifest.webmanifest 200 in 79ms
+ GET / 200 in 10938ms
+ ✓ Compiled in 1118ms (364 modules)
+ ✓ Compiled in 1113ms (364 modules)
+ ✓ Compiled in 1241ms (364 modules)
+ ✓ Compiled in 847ms (364 modules)
+ ✓ Compiled in 3.6s (860 modules)
+  ▲ Next.js 14.2.35
+  - Local:        http://localhost:3000
+  - Network:      http://0.0.0.0:3000
+  - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 11.5s

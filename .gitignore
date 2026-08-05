@@ -36,6 +36,7 @@ dist
 .env.*
 *token.json*
 *credentials.json*
+clones/
 
 # Logs and debug files
 npm-debug.log*
