@@ -1,22 +1,10 @@
+import deploymentPolicy from './lib/deployment-policy.cjs'
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import { desiredRoleForEmail } from './lib/role-utils'
 
 function getPreferredOrigin() {
-  const configuredBaseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://www.ekahnews.com'
-
-  try {
-    const url = new URL(configuredBaseUrl)
-
-    if (url.hostname === 'ekahnews.com') {
-      url.hostname = 'www.ekahnews.com'
-    }
-
-    url.protocol = 'https:'
-    return url.origin
-  } catch {
-    return 'https://www.ekahnews.com'
-  }
+  return deploymentPolicy.getPublicDeployment().origin
 }
 
 function shouldRedirectToPreferredOrigin(currentUrl, preferredOrigin) {

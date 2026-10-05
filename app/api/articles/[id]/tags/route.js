@@ -17,7 +17,7 @@ export async function DELETE(request, { params }) {
 
         const { data: article, error: articleError } = await admin
             .from('articles')
-            .select('author_id, slug, categories(slug)')
+            .select('author_id, slug, categories:categories!articles_category_id_fkey(slug)')
             .eq('id', articleId)
             .single()
 

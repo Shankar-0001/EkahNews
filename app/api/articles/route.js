@@ -1,3 +1,4 @@
+import { atomicArticleArguments, assertDeploymentTarget } from '@/lib/atomic-article.mjs'
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { apiResponse, logger } from '@/lib/api-utils'
@@ -21,12 +22,7 @@ function normalizeStructuredData(value) {
   }
 }
 
-function isMissingOgImageColumnError(error) {
-  const message = error?.message || ''
-  return typeof message === 'string'
-    && message.includes('og_image')
-    && message.toLowerCase().includes('column')
-}
+
 
 async function findDuplicateArticleByTitle(admin, title) {
   const { data } = await admin
@@ -46,7 +42,7 @@ function revalidateArticleSurface(article) {
     if (article?.slug) {
       revalidatePath(`/${categorySlug}/${article.slug}`)
     }
-    revalidatePath('/')
+    revalidatePath('/', 'layout')
     revalidatePath('/latest-news')
     revalidatePath(`/category/${categorySlug}`)
     revalidatePath('/sitemap.xml')
@@ -65,6 +61,7 @@ export async function POST(request) {
   const requestId = 'POST-article'
 
   try {
+    assertDeploymentTarget()
     const rateResult = checkRateLimit({
       key: `${getClientIp(request)}:articles:create`,
       limit: 30,
@@ -93,6 +90,7 @@ export async function POST(request) {
     logger.info(`[${requestId}] User authenticated`, { userId: user.userId })
 
     const articleData = await request.json()
+    atomicArticleArguments(articleData)
     articleData.title = articleData.title?.trim?.() || articleData.title
     articleData.keywords = normalizeManualKeywords(articleData.keywords || [])
     articleData.schema_type = articleData.schema_type || 'NewsArticle'
@@ -125,7 +123,7 @@ export async function POST(request) {
     await validateArticlePublishReadiness(admin, articleData)
 
     if (user.role !== 'admin') {
-      articleData.status = 'pending'
+      articleData.status = articleData.status === 'draft' ? 'draft' : 'pending'
       delete articleData.published_at
     }
 
@@ -147,22 +145,9 @@ export async function POST(request) {
       og_image: articleData.og_image?.trim() || null,
     }
 
-    let article
-    let error
-    ;({ data: article, error } = await admin
-      .from('articles')
-      .insert([insertPayload])
-      .select('id, title, slug, excerpt, content, content_json, featured_image_url, featured_image_alt, keywords, status, category_id, author_id, seo_title, seo_description, canonical_url, schema_type, structured_data, published_at, created_at, updated_at, categories(slug), authors(slug)')
-      .single())
-
-    if (error && isMissingOgImageColumnError(error)) {
-      const { og_image, ...fallbackPayload } = insertPayload
-      ;({ data: article, error } = await admin
-        .from('articles')
-        .insert([fallbackPayload])
-        .select('id, title, slug, excerpt, content, content_json, featured_image_url, featured_image_alt, keywords, status, category_id, author_id, seo_title, seo_description, canonical_url, schema_type, structured_data, published_at, created_at, updated_at, categories(slug), authors(slug)')
-        .single())
-    }
+    const { data: article, error } = await admin.rpc(
+      'save_article_with_taxonomy', atomicArticleArguments(insertPayload)
+    )
 
     if (error) {
       logger.error(`[${requestId}] Database error`, error)

@@ -118,7 +118,7 @@ export default async function TagPage({ params }) {
     supabase.from('categories').select('id, name, slug').order('name'),
     supabase
       .from('articles')
-      .select('id, title, slug, excerpt, featured_image_url, published_at, categories(name, slug), authors(name, slug), article_tags!inner(tag_id)', { count: 'exact' })
+      .select('id, title, slug, excerpt, featured_image_url, published_at, categories:categories!articles_category_id_fkey(name, slug), authors(name, slug), article_tags!inner(tag_id)', { count: 'exact' })
       .eq('status', 'published')
       .eq('article_tags.tag_id', tag.id)
       .order('published_at', { ascending: false })

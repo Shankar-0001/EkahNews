@@ -1,4 +1,7 @@
+import { SITE_URL, IS_NON_INDEXABLE_SITE, absoluteUrl } from '@/lib/site-config'
+
 export default function robots() {
+  if (IS_NON_INDEXABLE_SITE) return { rules: { userAgent: '*', disallow: '/' } }
   return {
     rules: [
       {
@@ -45,10 +48,10 @@ export default function robots() {
       },
     ],
     sitemap: [
-      'https://www.ekahnews.com/sitemap.xml',
-      'https://www.ekahnews.com/sitemap-index.xml',
-      'https://www.ekahnews.com/news-sitemap.xml',
+      absoluteUrl('/sitemap.xml'),
+      absoluteUrl('/sitemap-index.xml'),
+      absoluteUrl('/news-sitemap.xml'),
     ],
-    host: 'https://www.ekahnews.com',
+    host: SITE_URL,
   }
 }

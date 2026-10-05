@@ -1,9 +1,13 @@
+const deployment = require('./lib/deployment-policy.server.cjs').assertDeploymentTarget()
 const fs = require('fs')
 const path = require('path')
+const rehearsalDist = process.env.EKAH_REHEARSAL_DIST_DIR
+if (rehearsalDist && !['.next-rehearsal-dev','.next-rehearsal-build'].includes(rehearsalDist)) throw new Error('Unsupported rehearsal output directory')
+const distDir = rehearsalDist || '.next'
 
 function findPolyfillsChunkTarget() {
   try {
-    const chunkDir = path.join(process.cwd(), '.next', 'static', 'chunks')
+    const chunkDir = path.join(process.cwd(), distDir, 'static', 'chunks')
     const entry = fs
       .readdirSync(chunkDir)
       .find((name) => /^polyfills-[^.]+\.js$/.test(name))
@@ -23,6 +27,14 @@ function buildCsp() {
     ? supabaseOrigin.replace(/^https/, 'wss').replace(/^http/, 'ws')
     : ''
   const isDev = process.env.NODE_ENV !== 'production'
+  let isHttpLoopback = false
+  try {
+    const baseUrl = new URL(process.env.NEXT_PUBLIC_BASE_URL || '')
+    isHttpLoopback = baseUrl.protocol === 'http:'
+      && ['localhost', '127.0.0.1', '[::1]'].includes(baseUrl.hostname)
+  } catch {
+    // Keep upgrades enabled when the configured base URL is missing or invalid.
+  }
   const connectSrc = [
     "'self'",
     supabaseOrigin,
@@ -80,11 +92,12 @@ function buildCsp() {
     "frame-src 'self' https://googleads.g.doubleclick.net https://tpc.googlesyndication.com",
     "media-src 'self' blob: https:",
     "worker-src 'self' blob:",
-    'upgrade-insecure-requests',
+    ...(isHttpLoopback ? [] : ['upgrade-insecure-requests']),
   ].join('; ')
 }
 
 const nextConfig = {
+  distDir,
   output: 'standalone',
   trailingSlash: false,
   images: {
@@ -151,7 +164,10 @@ const nextConfig = {
       { key: 'Cross-Origin-Resource-Policy', value: 'same-site' },
     ]
 
-    if (process.env.NODE_ENV === 'production') {
+    let isLocalSite = false
+    try { isLocalSite = ['localhost', '127.0.0.1', '[::1]'].includes(new URL(process.env.NEXT_PUBLIC_BASE_URL || '').hostname) } catch {}
+    if (deployment.noindex) headers.push({ key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive' })
+    if (process.env.NODE_ENV === 'production' && !isLocalSite) {
       headers.push({ key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains; preload' })
     }
 
@@ -192,7 +208,7 @@ const nextConfig = {
       },
       {
         source: '/category/tech-news/:path*',
-        destination: '/category/technology',
+        destination: '/category/technology/:path*',
         permanent: true,
       },
       {

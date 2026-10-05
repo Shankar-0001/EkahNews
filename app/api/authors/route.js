@@ -280,7 +280,7 @@ export async function PATCH(request) {
 
         const { data: articleRows } = await supabase
             .from('articles')
-            .select('slug, categories(slug)')
+            .select('slug, categories:categories!articles_category_id_fkey(slug)')
             .eq('author_id', id)
             .eq('status', 'published')
             .limit(200)

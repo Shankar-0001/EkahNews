@@ -1,6 +1,6 @@
 import Head from 'next/head'
-import { createClient } from '@supabase/supabase-js'
-import { absoluteUrl, getPublicationLogoUrl, resolveCanonicalUrl } from '@/lib/site-config'
+import { createPublicClient } from '@/lib/supabase/public-server'
+import { absoluteUrl, getPublicationLogoUrl, resolveCanonicalUrl, IS_NON_INDEXABLE_SITE } from '@/lib/site-config'
 import { keywordsToMetadataValue, normalizeManualKeywords } from '@/lib/keywords'
 import { parseStructuredDataOverride } from '@/lib/seo-utils'
 
@@ -56,21 +56,7 @@ const AMP_CUSTOM_CSS = `
   }
 `
 
-function getSupabase() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Missing Supabase public environment variables for web stories')
-  }
-
-  return createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  })
-}
+function getSupabase() { return createPublicClient() }
 
 function getProductionHostname() {
   const siteUrl = process.env.NEXT_PUBLIC_BASE_URL
@@ -283,9 +269,9 @@ export default function WebStoryAmpPage({ story, gaMeasurementId }) {
   return (
     <>
       <Head>
-        <title>{story.title} | EkahNews</title>
+        <title>{`${story.title} | EkahNews`}</title>
         <meta name="description" content={description} />
-        <meta name="robots" content="index, follow, max-image-preview:large" />
+        <meta name="robots" content={IS_NON_INDEXABLE_SITE ? 'noindex, nofollow, noarchive' : 'index, follow, max-image-preview:large'} />
         <meta property="og:type" content="article" />
         <meta property="og:title" content={story.title} />
         <meta property="og:description" content={description} />

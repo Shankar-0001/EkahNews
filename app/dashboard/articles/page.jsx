@@ -32,7 +32,7 @@ export default async function ArticlesPage({ searchParams }) {
     .select(`
       *,
       authors (id, name, user_id),
-      categories (name, slug)
+      categories:categories!articles_category_id_fkey(name, slug)
     `, { count: 'exact' })
     .order('created_at', { ascending: false })
     .range(from, to)

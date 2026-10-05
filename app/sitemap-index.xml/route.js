@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 
-const BASE_URL = 'https://www.ekahnews.com'
+import { SITE_URL as BASE_URL } from '@/lib/site-config'
 
 export async function GET() {
   const lastmod = new Date().toISOString()

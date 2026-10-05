@@ -1,3 +1,4 @@
+import { publishedArticleFromHistory } from '@/lib/article-history.mjs'
 import { createClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 
@@ -9,30 +10,12 @@ export default async function LegacyArticleRedirectPage({ params }) {
 
   let { data: article } = await supabase
     .from('articles')
-    .select('slug, categories(slug)')
+    .select('slug, categories:categories!articles_category_id_fkey(slug)')
     .eq('slug', slug)
     .eq('status', 'published')
     .maybeSingle()
 
-  if (!article) {
-    const { data: slugHistory } = await supabase
-      .from('slug_history')
-      .select('new_slug')
-      .eq('old_slug', slug)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (slugHistory?.new_slug) {
-      const { data: redirectedArticle } = await supabase
-        .from('articles')
-        .select('slug, categories(slug)')
-        .eq('slug', slugHistory.new_slug)
-        .eq('status', 'published')
-        .maybeSingle()
-      article = redirectedArticle
-    }
-  }
+  if (!article) article = await publishedArticleFromHistory(supabase,slug)
 
   if (!article) notFound()
 

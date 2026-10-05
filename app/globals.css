@@ -4,13 +4,13 @@
 
 @layer base {
   :root {
-    --background: 210 20% 98%;
-    --foreground: 220 15% 12%;
+    --background: 210 25% 97%;
+    --foreground: 220 14% 16%;
     --card: 0 0% 100%;
     --card-foreground: 220 15% 12%;
     --popover: 0 0% 100%;
     --popover-foreground: 220 15% 12%;
-    --primary: 221 83% 47%;
+    --primary: 222 47% 11%;
     --primary-foreground: 210 40% 98%;
     --secondary: 210 30% 95%;
     --secondary-foreground: 220 15% 20%;
@@ -22,8 +22,25 @@
     --destructive-foreground: 210 40% 98%;
     --border: 220 14% 90%;
     --input: 220 14% 90%;
-    --ring: 221 83% 47%;
+    --ring: 222 47% 11%;
     --radius: 0.5rem;
+    --text-font: "Bitter", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+    --body-font: "Bitter", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+    --ui-font: "Open Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+    --title-font: var(--body-font);
+    --h-font: var(--body-font);
+    --tertiary-font: "DM Serif Display", Georgia, serif;
+    --main-width: 1280px;
+    --wrap-padding: 30px;
+    --sidebar-width: 300px;
+    --sidebar-pad: 36px;
+    --c-page-bg: #f6f8fa;
+    --c-card-bg: #ffffff;
+    --c-border: #dbe2ec;
+    --c-heading: #111827;
+    --c-text: #282828;
+    --c-muted: #374151;
+    --c-accent: #0b1321;
   }
 
   .dark {
@@ -49,17 +66,29 @@
   }
 }
 
+@media (max-width: 940px) {
+  :root {
+    --wrap-padding: 35px;
+  }
+}
+
+@media (max-width: 767px) {
+  :root {
+    --wrap-padding: 25px;
+  }
+}
+
 @layer base {
   * {
     @apply border-border;
   }
   body {
     @apply bg-background text-foreground;
-    font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-family: var(--body-font);
   }
 
   h1, h2, h3 {
-    font-family: Georgia, "Times New Roman", serif;
+    font-family: var(--h-font);
   }
 }
 

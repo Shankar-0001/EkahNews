@@ -6,7 +6,7 @@ import WebStoryCard from '@/components/content/WebStoryCard'
 
 const INITIAL_VISIBLE = 4
 const LOAD_MORE_COUNT = 4
-const SIDE_BUTTON_CLASS = 'hidden md:inline-flex absolute top-1/2 z-10 h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-slate-300/80 bg-white text-slate-800 shadow-sm transition-colors hover:bg-slate-200 hover:text-[#d62828] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white'
+const SIDE_BUTTON_CLASS = 'hidden md:inline-flex absolute top-1/2 z-10 h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--c-border)] bg-[var(--c-card-bg)] text-[var(--c-heading)] shadow-sm transition-colors hover:bg-slate-200 hover:text-[var(--c-accent)] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white'
 
 export default function WebStoriesRail({ stories = [] }) {
   const scrollRef = useRef(null)
@@ -33,7 +33,7 @@ export default function WebStoriesRail({ stories = [] }) {
   if (!mounted || stories.length === 0) return null
 
   return (
-    <div className="relative overflow-visible rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+    <div className="relative overflow-visible rounded-xl border border-[var(--c-border)] bg-[var(--c-card-bg)] p-[15px] shadow-sm dark:border-slate-700 dark:bg-slate-900">
       <button
         type="button"
         onClick={() => scrollByAmount('left')}
@@ -68,7 +68,7 @@ export default function WebStoriesRail({ stories = [] }) {
           <button
             type="button"
             onClick={() => setVisibleCount((count) => Math.min(count + LOAD_MORE_COUNT, stories.length))}
-            className="inline-flex min-w-[190px] items-center justify-center rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:border-slate-500 dark:hover:bg-slate-800"
+            className="inline-flex min-w-[190px] items-center justify-center rounded-full border border-[var(--c-border)] bg-[var(--c-card-bg)] px-6 py-3 font-sans text-[12px] font-semibold text-[var(--c-muted)] transition-colors hover:border-[var(--c-border)] hover:bg-slate-50 hover:text-[var(--c-heading)] dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:border-slate-500 dark:hover:bg-slate-800"
           >
             Load More
           </button>

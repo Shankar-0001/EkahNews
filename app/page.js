@@ -1,12 +1,18 @@
 import { createOptionalPublicClient } from '@/lib/supabase/public-server'
+import { Fragment } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { ArrowRight, Clock3, TrendingUp, User } from 'lucide-react'
+import { ArrowRight, Clock3, TrendingUp } from 'lucide-react'
 import StructuredData, { OrganizationSchema, WebSiteSchema } from '@/components/seo/StructuredData'
 import PublicHeader from '@/components/layout/PublicHeader'
 import ContentUnavailableNotice from '@/components/common/ContentUnavailableNotice'
-import ArticleMiniCard from '@/components/content/ArticleMiniCard'
-import WebStoriesRail from '@/components/home/WebStoriesRail'
+import SectionHeader from '@/components/home/SectionHeader'
+import FeaturedArticle from '@/components/home/FeaturedArticle'
+import SecondaryArticle from '@/components/home/SecondaryArticle'
+import FeatureCard from '@/components/home/FeatureCard'
+import MoreNewsSidebar from '@/components/home/MoreNewsSidebar'
+import CryptoFeaturedBlock from '@/components/home/CryptoFeaturedBlock'
+import HomeWebStoryRail from '@/components/home/HomeWebStoryRail'
 import { getPublicationLogoUrl, SITE_URL } from '@/lib/site-config'
 import { filterBlockedCategories } from '@/lib/category-utils'
 import SchemaScript from '@/components/seo/SchemaScript'
@@ -36,6 +42,14 @@ const FOR_YOU_CATEGORIES = [
   { label: 'Technology', sourceSlug: 'technology' },
 ]
 const FOR_YOU_ARTICLES_PER_CATEGORY = 3
+const HOMEPAGE_STACK_SECTIONS = [
+  { key: 'crypto', title: 'Crypto', slugs: ['cryptocurrency'] },
+  { key: 'market', title: 'Market', slugs: ['markets', 'finance-markets'] },
+  { key: 'ai', title: 'AI', slugs: ['artificial-intelligence', 'ai'] },
+  { key: 'technology', title: 'Technology', slugs: ['technology'] },
+  { key: 'business', title: 'Business', slugs: ['business'] },
+  { key: 'finance', title: 'Finance', slugs: ['finance', 'finance-markets', 'markets'] },
+]
 
 const siteUrl = SITE_URL
 const ogImage = getPublicationLogoUrl()
@@ -65,76 +79,95 @@ function getArticleHref(article) {
   return `/${article.categories?.slug || 'news'}/${article.slug}`
 }
 
-function SectionHeading({ kicker, title, href, hrefLabel = 'Load More' }) {
+function CompactSectionFrame({ title, href, children }) {
   return (
-    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        {kicker ? (
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
-            {kicker}
-          </p>
-        ) : null}
-        <h2 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white md:text-3xl">
+    <section className="border border-[var(--c-border)] bg-[var(--c-card-bg)] p-[15px] dark:border-slate-800 dark:bg-slate-900">
+      <div className="flex items-center justify-between border-b border-[var(--c-border)] pb-[15px] dark:border-slate-800/90">
+        <h2 className="font-sans text-[30px] font-bold leading-none tracking-[-0.03em] text-[var(--c-heading)] dark:text-white">
           {title}
         </h2>
+        {href ? (
+          <Link
+            href={href}
+            className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1 px-2 font-sans text-[12px] font-semibold uppercase tracking-[0.08em] text-slate-500 hover:text-[var(--c-accent)] dark:text-slate-400"
+          >
+            More
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        ) : null}
       </div>
-      {href && (
-        <Link
-          href={href}
-          className="inline-flex items-center gap-2 text-sm font-semibold text-[#d62828] hover:underline dark:text-red-400"
-        >
-          {hrefLabel}
-          <ArrowRight className="h-4 w-4" />
-        </Link>
-      )}
-    </div>
+      <div className="pt-[15px]">{children}</div>
+    </section>
   )
 }
 
-function HeroMeta({ article, light = false }) {
+function StoryMeta({ article, compact = false }) {
   if (!article) return null
 
-  const metaTextClass = light ? 'text-white/90' : 'text-slate-500 dark:text-slate-400'
-  const iconClass = light ? 'text-red-300' : 'text-[#d62828] dark:text-red-400'
-
   return (
-    <div className={`mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs md:text-sm ${metaTextClass}`}>
-      {article.categories?.name && (
-        <span className="inline-flex items-center gap-2">
-          <span className={`h-2 w-2 rounded-full ${light ? 'bg-red-300' : 'bg-[#d62828]'}`} />
-          {article.categories.name}
-        </span>
-      )}
-      {article.authors?.name && (
-        <span className="inline-flex items-center gap-2">
-          <User className={`h-4 w-4 ${iconClass}`} />
-          {article.authors.name}
-        </span>
-      )}
+    <div className={`mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 font-sans ${compact ? 'text-[10px]' : 'text-[12px]'} font-semibold text-slate-500 dark:text-slate-400`}>
       {article.published_at && (
         <span className="inline-flex items-center gap-2">
-          <Clock3 className={`h-4 w-4 ${iconClass}`} />
+          <Clock3 className="h-3 w-3 text-[var(--c-accent)] dark:text-slate-300" />
           {formatArticleCardDate(article.published_at)}
         </span>
       )}
+      {article.authors?.name && <span>By {article.authors.name}</span>}
     </div>
   )
-}
-
-function getAdaptiveHeadlineClass(title = '', {
-  shortClass,
-  mediumClass,
-  longClass,
-}) {
-  const length = (title || '').trim().length
-
-  if (length > 95) return longClass
-  if (length > 60) return mediumClass
-  return shortClass
 }
 
 function normalizeHomepageCategorySlug(slug = '') {
   return CATEGORY_SLUG_ALIASES[slug] || slug
+}
+
+function StoryThumb({ article, className = '', sizes = '100px', icon = null }) {
+  return (
+    <div className={`relative overflow-hidden bg-slate-100 dark:bg-slate-800 ${className}`}>
+      {article?.featured_image_url || article?.cover_image ? (
+        <Image
+          src={article.featured_image_url || article.cover_image}
+          alt={article.title}
+          fill
+          className="object-cover"
+          sizes={sizes}
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center text-[10px] text-slate-400 dark:text-slate-500">
+          img
+        </div>
+      )}
+      {icon}
+    </div>
+  )
+}
+
+function TextHeadline({ article, href, className = '' }) {
+  return (
+    <Link href={href} className={`block font-title font-semibold leading-snug text-[var(--c-heading)] hover:underline hover:underline-offset-2 dark:text-white ${className}`}>
+      {article.title}
+    </Link>
+  )
+}
+
+function getStoriesForSlugs(articles, slugs) {
+  return articles.filter((article) => slugs.includes(article?.categories?.slug)).slice(0, 6)
+}
+
+function SidebarNewsItem({ article }) {
+  return (
+    <Link
+      href={getArticleHref(article)}
+      className="grid grid-cols-[58px_1fr] gap-2 border-b border-slate-100 py-2 last:border-b-0 dark:border-slate-800"
+    >
+      <StoryThumb article={article} className="h-[44px] w-[58px]" sizes="58px" />
+      <div className="min-w-0">
+        <p className="font-title text-[13px] font-semibold leading-snug text-[var(--c-heading)] line-clamp-3 dark:text-white">
+          {article.title}
+        </p>
+      </div>
+    </Link>
+  )
 }
 
 export default async function HomePage() {
@@ -161,7 +194,7 @@ export default async function HomePage() {
           featured_image_url,
           published_at,
           authors (name),
-          categories (name, slug)
+          categories:categories!articles_category_id_fkey(name, slug)
         `)
         .eq('status', 'published')
         .order('published_at', { ascending: false })
@@ -261,7 +294,7 @@ export default async function HomePage() {
           published_at,
           category_id,
           authors (name),
-          categories (name, slug)
+          categories:categories!articles_category_id_fkey(name, slug)
         `)
         .eq('status', 'published')
         .in('category_id', rawCategoryIds)
@@ -317,7 +350,7 @@ export default async function HomePage() {
           published_at,
           category_id,
           authors (name),
-          categories (name, slug)
+          categories:categories!articles_category_id_fkey(name, slug)
         `)
         .eq('status', 'published')
         .in('category_id', [...new Set(forYouConfigs.map((item) => item.categoryId))])
@@ -351,31 +384,31 @@ export default async function HomePage() {
   }
 
   const featuredArticle = articles[0]
-  const featuredSidebarStories = articles.slice(1, 5)
-  const moreNewsArticles = articles.slice(19, 31)
+  const featuredSidebarStories = articles.slice(1, 3)
+  const latestGridStories = articles.slice(3, 7)
+  const moreNewsArticles = articles
   const homepageLeadArticles = articles.slice(0, 10)
   const itemListSchema = {
     '@context': 'https://schema.org',
     '@type': 'ItemList',
     name: 'Latest News - EkahNews',
-    url: 'https://www.ekahnews.com',
+    url: SITE_URL,
     numberOfItems: homepageLeadArticles.length,
     itemListElement: homepageLeadArticles.map((article, index) => ({
       '@type': 'ListItem',
       position: index + 1,
-      url: `https://www.ekahnews.com/${article.categories?.slug || 'news'}/${article.slug}`,
+      url: `${SITE_URL}/${article.categories?.slug || 'news'}/${article.slug}`,
       name: article.title,
     })),
   }
 
-  const engagementMap = new Map((engagement || []).map((row) => [row.article_id, row]))
-  const mostShared = [...articles]
-    .map((article) => ({
-      ...article,
-      _shares: engagementMap.get(article.id)?.shares || 0,
-    }))
-    .sort((a, b) => b._shares - a._shares)
-    .slice(0, 5)
+  const homepageStackSections = HOMEPAGE_STACK_SECTIONS.map((section) => ({
+    ...section,
+    articles: getStoriesForSlugs(articles, section.slugs),
+  })).filter((section) => section.articles.length > 0)
+  const cryptoSection = homepageStackSections.find((section) => section.key === 'crypto') || null
+  const remainingHomepageSections = homepageStackSections.filter((section) => section.key !== 'crypto')
+  const latestNewsHref = '/latest-news'
 
   return (
     <>
@@ -383,10 +416,11 @@ export default async function HomePage() {
       <StructuredData data={WebSiteSchema()} />
       <SchemaScript schema={itemListSchema} />
 
-      <div className="bg-[#f8fafc] dark:bg-slate-950">
+      <div className="bg-[var(--c-page-bg)] dark:bg-slate-950">
         <PublicHeader categories={categories || []} />
 
-        <main className="w-full max-w-6xl mx-auto px-4 py-8 md:py-10">
+        <main className="mx-auto w-full max-w-[var(--main-width)] px-[var(--wrap-padding)] py-[30px]">
+          <h1 className="sr-only">EkahNews: Latest news and analysis</h1>
           {isMissingPublicConfig && process.env.NODE_ENV !== 'production' && (
             <section className="mb-8 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
               Homepage data is empty because `NEXT_PUBLIC_SUPABASE_URL` and/or `NEXT_PUBLIC_SUPABASE_ANON_KEY` is missing.
@@ -400,337 +434,309 @@ export default async function HomePage() {
               message="We are having trouble loading the homepage stories right now. Please refresh the page or check back shortly."
             />
           )}
-          {featuredArticle && (
-            <section className="mb-10">
-              <div className="grid gap-4 lg:grid-cols-[minmax(0,1.65fr)_minmax(280px,0.95fr)] lg:items-start">
-                <div className="space-y-3">
-                  <Link
-                    href={getArticleHref(featuredArticle)}
-                    className="group block overflow-hidden"
-                  >
-                    <div className="relative aspect-[16/10] bg-slate-100 dark:bg-slate-800 sm:aspect-[16/9] lg:aspect-[16/10]">
-                      {featuredArticle.featured_image_url ? (
-                        <Image
-                          src={featuredArticle.featured_image_url}
-                          alt={featuredArticle.title}
-                          fill
-                          priority
-                          className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
-                          sizes="(max-width: 1023px) 100vw, (max-width: 1280px) 60vw, 62vw"
-                        />
-                      ) : (
-                        <div className="h-full w-full" aria-hidden="true" />
-                      )}
-                    </div>
-                  </Link>
-
-                  <Link
-                    href={getArticleHref(featuredArticle)}
-                    className="group block px-1 py-2 transition-colors"
-                  >
-                    <h1 className="text-[1.3rem] font-extrabold leading-tight tracking-tight text-slate-900 line-clamp-3 group-hover:underline group-hover:underline-offset-4 dark:text-white sm:text-[1.5rem] md:text-[1.75rem] lg:text-[1.9rem]">
-                      {featuredArticle.title}
-                    </h1>
-                    <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-600 dark:text-slate-400">
-                      {featuredArticle.published_at && (
-                        <span>{formatArticleCardDate(featuredArticle.published_at)}</span>
-                      )}
-                      {featuredArticle.authors?.name && (
-                        <span>by {featuredArticle.authors.name}</span>
-                      )}
-                    </div>
-                  </Link>
-                </div>
-
-                <div className="p-1 lg:pt-0">
-                  <div className="mb-3 flex items-center gap-2 px-2 text-xs font-bold uppercase tracking-[0.24em] text-slate-600 dark:text-slate-300 sm:px-2.5 lg:px-2">
-                    <Clock3 className="h-3.5 w-3.5 text-[#d62828] dark:text-red-400" />
-                    <span>Latest News</span>
-                  </div>
-                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
-                    {featuredSidebarStories.map((article) => (
-                      <Link
-                        key={article.id}
-                        href={getArticleHref(article)}
-                        className="group grid min-w-0 grid-cols-[minmax(0,1fr)_72px] items-center gap-2 p-2 sm:grid-cols-[minmax(0,1fr)_80px] sm:p-2.5 lg:grid-cols-[minmax(0,1fr)_88px]"
-                      >
-                        <div className="min-w-0">
-                          <p className="break-words text-[0.92rem] font-medium leading-snug text-slate-900 decoration-current underline-offset-4 group-hover:underline dark:text-white sm:text-[0.98rem]">
-                              {article.title}
-                          </p>
-                          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600 dark:text-slate-400 sm:text-sm">
-                            {article.published_at && (
-                              <span>{formatArticleCardDate(article.published_at)}</span>
-                            )}
-                            {article.authors?.name && (
-                              <span>by {article.authors.name}</span>
-                            )}
+          {(featuredArticle || cryptoSection) && (
+            <section className="mb-6">
+              <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,74.665%)_minmax(0,25%)]">
+                <section className="border border-[var(--c-border)] bg-[var(--c-card-bg)] p-[15px] dark:border-slate-800 dark:bg-slate-900">
+                  {featuredArticle ? (
+                    <>
+                      <SectionHeader title="Latest News" href={latestNewsHref} />
+                      <div className="pt-3.5">
+                        <div className="grid gap-5 md:grid-cols-[minmax(0,75.5%)_minmax(0,24.5%)]">
+                          <FeaturedArticle article={featuredArticle} />
+                          <div className="space-y-5">
+                            {featuredSidebarStories.map((article) => (
+                              <SecondaryArticle key={article.id} article={article} />
+                            ))}
                           </div>
                         </div>
 
-                        <div className="relative h-[72px] w-[72px] overflow-hidden bg-slate-100 dark:bg-slate-800 sm:h-[80px] sm:w-[80px] lg:h-[88px] lg:w-[88px]">
-                          {article.featured_image_url ? (
-                            <Image
-                              src={article.featured_image_url}
-                              alt={article.title}
-                              fill
-                              className="object-cover"
-                              sizes="(max-width: 639px) 72px, (max-width: 1023px) 80px, 88px"
-                            />
-                          ) : (
-                            <div className="flex h-full items-center justify-center text-xs font-medium text-slate-400 dark:text-slate-500">
-                              img
-                            </div>
-                          )}
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <div className="mt-4 flex justify-center">
-                <Link
-                  href="/latest-news"
-                  aria-label="Read more latest news"
-                  className="inline-flex items-center justify-center border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-900 transition-colors hover:border-[#b4235a] hover:text-[#b4235a] dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:border-[#d94b7d] dark:hover:text-[#d94b7d]"
-                >
-                  Read More
-                </Link>
-              </div>
-              <div className="mt-8" />
-            </section>
-          )}
-
-          <section className="mb-10">
-            <div className="mb-4 flex items-center gap-4">
-              <div className="h-[2px] flex-1 bg-slate-300 dark:bg-slate-700" />
-              <p className="text-[1.2rem] font-bold tracking-tight text-slate-900 dark:text-white">
-                For You
-              </p>
-              <div className="h-[2px] flex-1 bg-slate-300 dark:bg-slate-700" />
-            </div>
-
-            <div className="grid w-full gap-3 xl:grid-cols-[minmax(0,1.42fr)_minmax(260px,0.58fr)] xl:items-stretch">
-              {forYouCards.length > 0 && (
-                <div className="h-full overflow-hidden border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                  <div className="grid h-full gap-x-6 gap-y-2 md:grid-cols-2">
-                    {forYouCards.map((item, index) => {
-                      return (
-                        <div
-                          key={`${item.label}-${index}`}
-                          className={`py-2 ${index % 2 === 0 ? 'md:pr-1' : 'md:pl-1'}`}
-                        >
-                          <div className="min-w-0">
-                            <Link
-                              href={`/category/${item.category?.slug || item.sourceSlug}`}
-                              className="inline-block text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500 hover:underline dark:text-slate-400"
-                            >
-                              {item.label}
-                            </Link>
-
-                            <div className="mt-1 space-y-2">
-                              {item.articles.map((article, articleIndex) => (
-                                <div
-                                  key={article.id}
-                                  className={articleIndex > 0 ? 'border-t border-slate-200 pt-2 dark:border-slate-800' : ''}
-                                >
-                                  <div className="grid grid-cols-[minmax(0,1fr)_62px] gap-2 sm:grid-cols-[minmax(0,1fr)_68px]">
-                                    <div className="min-w-0">
-                                      <p className="text-[0.92rem] font-medium leading-snug text-slate-900 dark:text-white">
-                                        <Link
-                                          href={getArticleHref(article)}
-                                          className="hover:underline hover:underline-offset-4"
-                                        >
-                                          {article.title}
-                                        </Link>
-                                      </p>
-                                      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400">
-                                        {article.published_at && (
-                                          <span>{formatArticleCardDate(article.published_at)}</span>
-                                        )}
-                                        {article.authors?.name && (
-                                          <span>By {article.authors.name}</span>
-                                        )}
-                                      </div>
-                                    </div>
-
-                                    <Link
-                                      href={getArticleHref(article)}
-                                      className="relative block h-[62px] w-[62px] overflow-hidden bg-slate-100 dark:bg-slate-800 sm:h-[68px] sm:w-[68px]"
-                                    >
-                                      {article.featured_image_url ? (
-                                        <Image
-                                          src={article.featured_image_url}
-                                          alt={article.title}
-                                          fill
-                                          className="object-cover"
-                                          sizes="(max-width: 639px) 62px, 68px"
-                                        />
-                                      ) : (
-                                        <div className="flex h-full items-center justify-center text-[10px] text-slate-400 dark:text-slate-500">
-                                          img
-                                        </div>
-                                      )}
-                                    </Link>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
+                        {latestGridStories.length > 0 ? (
+                          <div className="mt-5 grid gap-5 md:grid-cols-3">
+                            {latestGridStories.slice(0, 3).map((article) => (
+                              <FeatureCard key={article.id} article={article} />
+                            ))}
                           </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-
-              <aside className="h-full border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-[#d62828]" />
-                  <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
-                    Popular Now
-                  </p>
-                </div>
-                <div className="mt-3 space-y-2">
-                  {mostShared.map((article, index) => (
-                    <Link
-                      key={article.id}
-                      href={getArticleHref(article)}
-                      className="group flex gap-2 p-1.5 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800"
-                    >
-                      <span className="mt-1 text-lg font-black text-slate-400 dark:text-slate-500">
-                        {String(index + 1).padStart(2, '0')}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
-                          {article.categories?.name || 'News'}
-                        </p>
-                        <h2 className="mt-1 text-sm font-semibold leading-6 text-slate-900 line-clamp-3 dark:text-white">
-                          <span className="group-hover:underline group-hover:underline-offset-4">
-                            {article.title}
-                          </span>
-                        </h2>
+                        ) : null}
                       </div>
-                    </Link>
-                  ))}
-                </div>
-              </aside>
-            </div>
-          </section>
+                    </>
+                  ) : null}
 
-          {webStories.length > 0 && (
-            <section className="mb-10">
-              <div className="mb-4 flex items-center gap-4">
-                <div className="h-[2px] flex-1 bg-slate-300 dark:bg-slate-700" />
-                <p className="text-[1.2rem] font-bold tracking-tight text-slate-900 dark:text-white">
-                  Web Stories
-                </p>
-                <div className="h-[2px] flex-1 bg-slate-300 dark:bg-slate-700" />
-              </div>
-              <WebStoriesRail stories={webStories} />
-              <div className="mt-4 flex justify-center">
-                <Link
-                  href="/web-stories"
-                  aria-label="Read more web stories"
-                  className="inline-flex items-center justify-center border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-900 transition-colors hover:border-[#b4235a] hover:text-[#b4235a] dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:border-[#d94b7d] dark:hover:text-[#d94b7d]"
-                >
-                  Read More
-                </Link>
+                  {cryptoSection ? (
+                    <div className={`${featuredArticle ? 'mt-[30px] border-t border-[var(--c-border)] pt-5 dark:border-slate-800' : ''}`}>
+                      <SectionHeader title="Crypto" href="/category/cryptocurrency" />
+                      <div className="pt-3.5">
+                        <CryptoFeaturedBlock
+                          article={cryptoSection.articles[0]}
+                          relatedArticles={cryptoSection.articles.slice(1, 3)}
+                        />
+                      </div>
+                    </div>
+                  ) : null}
+                </section>
+
+                <div className="lg:sticky lg:top-6">
+                  <MoreNewsSidebar articles={moreNewsArticles} />
+                </div>
               </div>
             </section>
           )}
+            <div className="space-y-[40px]">
+            {remainingHomepageSections.map((section) => {
+              const lead = section.articles[0]
+              const side = section.articles.slice(1, 5)
+              const bottom = section.articles.slice(1, 4)
+              const sectionHref =
+                section.key === 'market'
+                  ? '/category/markets'
+                  : section.key === 'finance'
+                    ? '/search?q=Finance'
+                    : `/category/${section.slugs[0]}`
 
-          <section className="mb-10">
-            <div className="mb-4 flex items-center gap-4">
-              <div className="h-[2px] flex-1 bg-slate-300 dark:bg-slate-700" />
-              <p className="text-[1.2rem] font-bold tracking-tight text-slate-900 dark:text-white">
-                Categories
-              </p>
-              <div className="h-[2px] flex-1 bg-slate-300 dark:bg-slate-700" />
-            </div>
+              if (!lead) return null
 
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {categoryShowcases.map((categoryBlock) => (
-                <section
-                  key={categoryBlock.id}
-                  className="overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
-                >
-                  <div className="px-4 pt-4 pb-3">
-                    <Link
-                      href={"/category/" + categoryBlock.slug}
-                      className="inline-flex items-center gap-1 text-lg font-bold text-slate-900 hover:text-[#b4235a] dark:text-white dark:hover:text-[#d94b7d]"
-                    >
-                      {categoryBlock.name}
-                      <ArrowRight className="h-4 w-4" />
-                    </Link>
-                  </div>
+              if (section.key === 'webstory') return null
 
-                  <div className="border-t border-slate-200 dark:border-slate-800">
-                    {categoryBlock.articles.map((article, index) => (
-                      <Link
-                        key={article.id}
-                        href={getArticleHref(article)}
-                        className={
-                          "grid grid-cols-[minmax(0,1fr)_72px] gap-3 px-4 py-4 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60 " +
-                          (index < categoryBlock.articles.length - 1 ? 'border-b border-slate-200 dark:border-slate-800' : '')
-                        }
-                      >
-                        <div className="min-w-0">
-                          <p className="line-clamp-3 text-[15px] font-semibold leading-snug text-slate-900 dark:text-white">
-                            {article.title}
+              if (section.key === 'ai') {
+                return (
+                  <section key={section.key} className="bg-[var(--c-card-bg)] pt-1 dark:bg-slate-900">
+                    <div className="border-b border-[#2f8dcc] pb-4">
+                      <Link href={sectionHref} className="inline-block">
+                        <h2 className="font-sans text-[30px] font-bold leading-none tracking-[-0.03em] text-[var(--c-heading)] hover:underline dark:text-white">
+                          {section.title}
+                        </h2>
+                      </Link>
+                    </div>
+                    <article className="grid gap-5 border-b border-[var(--c-border)] py-5 lg:grid-cols-[minmax(0,0.42fr)_minmax(0,0.58fr)] lg:items-center dark:border-slate-800">
+                      <Link href={getArticleHref(lead)} className="block">
+                        <StoryThumb
+                          article={lead}
+                          className="aspect-[16/10] bg-black"
+                          sizes="(max-width: 1023px) 100vw, 520px"
+                        />
+                      </Link>
+                      <div>
+                        <TextHeadline article={lead} href={getArticleHref(lead)} className="text-[19px] font-bold" />
+                        <StoryMeta article={lead} compact />
+                        {lead.excerpt ? (
+                          <p className="mt-4 font-body text-[12.5px] font-medium leading-[1.6] text-[var(--c-muted)] line-clamp-3 dark:text-slate-400">
+                            {lead.excerpt}
                           </p>
-                          <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
-                            {article.published_at && (
-                              <span>{formatArticleCardDate(article.published_at)}</span>
-                            )}
-                            {article.authors?.name && (
-                              <span>By {article.authors.name}</span>
-                            )}
+                        ) : null}
+                      </div>
+                    </article>
+                  </section>
+                )
+              }
+
+              if (section.key === 'technology') {
+                const topSideArticle = section.articles[1]
+                const listArticles = section.articles.slice(0, 3)
+                const cardArticles = section.articles.slice(3, 5)
+
+                return (
+                  <section key={section.key} className="bg-[var(--c-card-bg)] dark:bg-slate-900 p-4">
+                    <SectionHeader title={section.title} href={sectionHref} />
+
+                    <div className="grid gap-4 py-5 lg:grid-cols-[minmax(0,0.32fr)_minmax(0,0.43fr)_minmax(0,0.25fr)]">
+                      <article className="self-center">
+                        {lead.categories?.name ? (
+                          <p className="mb-3 font-sans text-[11px] font-bold text-[var(--c-accent)]">
+                            {lead.categories.name}
+                          </p>
+                        ) : null}
+                        <TextHeadline article={lead} href={getArticleHref(lead)} className="text-[19px] font-bold" />
+                        <StoryMeta article={lead} compact />
+                        {lead.excerpt ? (
+                          <p className="mt-4 font-body text-[12.5px] font-medium leading-[1.65] text-[var(--c-muted)] line-clamp-4 dark:text-slate-400">
+                            {lead.excerpt}
+                          </p>
+                        ) : null}
+                      </article>
+
+                      <Link href={getArticleHref(lead)} className="block">
+                        <StoryThumb
+                          article={lead}
+                          className="aspect-[16/10] bg-black"
+                          sizes="(max-width: 1023px) 100vw, 520px"
+                        />
+                      </Link>
+
+                      {topSideArticle ? (
+                        <article className="bg-[#f6f8fa] dark:bg-slate-800">
+                          <Link href={getArticleHref(topSideArticle)} className="block">
+                            <StoryThumb
+                              article={topSideArticle}
+                              className="aspect-[16/10] bg-black"
+                              sizes="(max-width: 1023px) 100vw, 300px"
+                            />
+                            <h3 className="px-3 py-4 font-title text-[14px] font-bold leading-snug text-[var(--c-heading)] hover:underline dark:text-white">
+                              {topSideArticle.title}
+                            </h3>
+                          </Link>
+                        </article>
+                      ) : null}
+                    </div>
+
+                    <div className="grid gap-5 border-t border-[var(--c-border)] pt-5 md:grid-cols-[minmax(0,0.49fr)_minmax(0,0.51fr)] dark:border-slate-800">
+                      <div className="space-y-[2px]">
+                        {listArticles.map((article) => (
+                          <Link
+                            key={article.id}
+                            href={getArticleHref(article)}
+                            className="grid grid-cols-[126px_1fr] gap-3"
+                          >
+                            <StoryThumb article={article} className="h-[86px] w-[126px]" sizes="126px" />
+                            <div className="flex min-w-0 items-center pr-2">
+                              <p className="font-title text-[13px] font-semibold leading-snug text-[var(--c-heading)] line-clamp-3 dark:text-white">
+                                {article.title}
+                              </p>
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+
+                      <div className="grid gap-5 sm:grid-cols-2">
+                        {cardArticles.map((article) => (
+                          <article key={article.id}>
+                            <Link href={getArticleHref(article)} className="block">
+                              <StoryThumb article={article} className="aspect-[16/10] bg-black" sizes="260px" />
+                              <h3 className="mt-3 font-title text-[14px] font-bold leading-snug text-[var(--c-heading)] hover:underline dark:text-white">
+                                {article.title}
+                              </h3>
+                            </Link>
+                            {article.excerpt ? (
+                              <p className="mt-2 font-body text-[12.5px] font-medium leading-[1.6] text-[var(--c-muted)] line-clamp-3 dark:text-slate-400">
+                                {article.excerpt}
+                              </p>
+                            ) : null}
+                          </article>
+                        ))}
+                      </div>
+                    </div>
+                  </section>
+                )
+              }
+
+              const sectionNode = (
+                <CompactSectionFrame key={section.key} title={section.title} href={sectionHref}>
+                  {section.key === 'market' ? (
+                    <div className="grid gap-5 lg:grid-cols-[minmax(0,1.45fr)_300px]">
+                      <article>
+                        <Link href={getArticleHref(lead)} className="block">
+                          <StoryThumb article={lead} className="aspect-[16/9] bg-black" sizes="(max-width: 1023px) 100vw, 760px" />
+                        </Link>
+                        <Link href={getArticleHref(lead)} className="mt-3 block">
+                          <h3 className="font-title text-[24px] font-bold leading-tight tracking-[-0.01em] text-[var(--c-heading)] hover:underline dark:text-white">
+                            {lead.title}
+                          </h3>
+                        </Link>
+                        <StoryMeta article={lead} compact />
+                        {lead.excerpt ? (
+                          <p className="mt-2 font-body text-[12.5px] font-medium leading-[1.6] text-[var(--c-muted)] line-clamp-3 dark:text-slate-400">
+                            {lead.excerpt}
+                          </p>
+                        ) : null}
+                      </article>
+                      <div className="space-y-[10px]">
+                        {side.map((article) => (
+                          <Link
+                            key={article.id}
+                            href={getArticleHref(article)}
+                            className="grid grid-cols-[86px_1fr] gap-3 border-b border-[var(--c-border)] pb-[10px] last:border-b-0 dark:border-slate-800"
+                          >
+                            <StoryThumb article={article} className="h-[54px] w-[86px]" sizes="86px" />
+                            <div className="min-w-0">
+                              <p className="font-title text-[13px] font-semibold leading-snug text-[var(--c-heading)] line-clamp-3 dark:text-white">
+                                {article.title}
+                              </p>
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  ) : section.key === 'entertainment' ? (
+                    <div className="grid gap-5 lg:grid-cols-[minmax(0,1.45fr)_300px]">
+                      <Link href={getArticleHref(lead)} className="block">
+                        <div className="relative aspect-[16/9] overflow-hidden bg-black">
+                          <StoryThumb article={lead} className="h-full w-full" sizes="(max-width: 1023px) 100vw, 760px" />
+                          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/50 to-transparent p-4">
+                            <h3 className="font-title text-[24px] font-bold leading-tight tracking-[-0.01em] text-white">
+                              {lead.title}
+                            </h3>
                           </div>
                         </div>
-
-                        <div className="relative h-[72px] w-[72px] overflow-hidden bg-slate-100 dark:bg-slate-800">
-                          {article.featured_image_url ? (
-                            <Image
-                              src={article.featured_image_url}
-                              alt={article.title}
-                              fill
-                              className="object-cover"
-                              sizes="72px"
-                            />
-                          ) : (
-                            <div className="flex h-full items-center justify-center text-[10px] font-medium text-slate-400 dark:text-slate-500">
-                              img
-                            </div>
-                          )}
-                        </div>
                       </Link>
-                    ))}
-                  </div>
-                </section>
-              ))}
-            </div>
-          </section>
+                      <div className="space-y-[10px]">
+                        {side.map((article) => (
+                          <Link
+                            key={article.id}
+                            href={getArticleHref(article)}
+                            className="grid grid-cols-[86px_1fr] gap-3 border-b border-[var(--c-border)] pb-[10px] last:border-b-0 dark:border-slate-800"
+                          >
+                            <StoryThumb article={article} className="h-[54px] w-[86px]" sizes="86px" />
+                            <div className="min-w-0">
+                              <p className="font-title text-[13px] font-semibold leading-snug text-[var(--c-heading)] line-clamp-3 dark:text-white">
+                                {article.title}
+                              </p>
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="grid gap-5 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+                        <div className={section.key === 'business' ? 'space-y-[20px] lg:flex lg:h-full lg:flex-col lg:justify-center' : 'space-y-[20px]'}>
+                          <div>
+                            <TextHeadline article={lead} href={getArticleHref(lead)} className="text-[19px] font-bold" />
+                            <StoryMeta article={lead} compact />
+                            {lead.excerpt ? (
+                              <p className="mt-2 font-body text-[12.5px] font-medium leading-[1.6] text-[var(--c-muted)] line-clamp-4 dark:text-slate-400">
+                                {lead.excerpt}
+                              </p>
+                            ) : null}
+                          </div>
+                          {section.articles.slice(1, 3).map((article) => (
+                            <div key={article.id} className="border-t border-[var(--c-border)] pt-[10px] dark:border-slate-800">
+                              <TextHeadline article={article} href={getArticleHref(article)} className="text-[13px]" />
+                              <StoryMeta article={article} compact />
+                            </div>
+                          ))}
+                        </div>
+                        <StoryThumb article={lead} className="aspect-[16/10]" sizes="(max-width: 1023px) 100vw, 560px" />
+                      </div>
 
-          {moreNewsArticles.length > 0 && (
-            <section>
-              <SectionHeading
-                title="More News"
-              />
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {moreNewsArticles.map((article, index) => (
-                  <ArticleMiniCard
-                    key={article.id}
-                    article={article}
-                    compact
-                    hideExcerpt={index > 3}
-                    squareImage
-                    squareCorners
-                  />
-                ))}
-              </div>
-            </section>
-          )}
+                      {bottom.length > 0 && (
+                        <div className="mt-5 grid gap-5 md:grid-cols-3">
+                          {bottom.map((article) => (
+                            <Link key={article.id} href={getArticleHref(article)} className="block border-t border-[var(--c-border)] pt-[10px] dark:border-slate-800">
+                              <p className="font-title text-[13px] font-semibold leading-snug text-[var(--c-heading)] line-clamp-3 dark:text-white">
+                                {article.title}
+                              </p>
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CompactSectionFrame>
+              )
+
+              if (section.key === 'business' && webStories.length > 0) {
+                return (
+                  <Fragment key="webstory-before-business">
+                    <CompactSectionFrame title="Webstory" href="/web-stories">
+                      <HomeWebStoryRail stories={webStories} />
+                    </CompactSectionFrame>
+                    {sectionNode}
+                  </Fragment>
+                )
+              }
+
+              return sectionNode
+            })}
+          </div>
         </main>
       </div>
     </>

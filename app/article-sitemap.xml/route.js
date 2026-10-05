@@ -2,7 +2,7 @@ import { createOptionalPublicClient } from '@/lib/supabase/public-server'
 import { getArticleCanonicalUrl } from '@/lib/site-config'
 import { urlsetXml, xmlResponse } from '@/lib/sitemap-utils'
 import { isBlockedCategorySlug } from '@/lib/category-utils'
-import { runListQuery } from '@/lib/supabase/query-timeout'
+import { runRequiredListQuery as runListQuery } from '@/lib/supabase/query-timeout'
 
 const MAX_URLS = 50000
 
@@ -15,7 +15,7 @@ export async function GET() {
   const { data: rows } = await runListQuery(
     (signal) => supabase
       .from('articles')
-      .select('slug, canonical_url, updated_at, published_at, categories(slug)')
+      .select('slug, canonical_url, updated_at, published_at, categories:categories!articles_category_id_fkey(slug)')
       .eq('status', 'published')
       .order('published_at', { ascending: false })
       .limit(MAX_URLS)

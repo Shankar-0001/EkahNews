@@ -131,7 +131,7 @@ export default async function TrendingKeywordPage({ params }) {
 
   const articlesQuery = supabase
     .from('articles')
-    .select('id, title, slug, excerpt, featured_image_url, published_at, categories(name, slug), authors(name)')
+    .select('id, title, slug, excerpt, featured_image_url, published_at, categories:categories!articles_category_id_fkey(name, slug), authors(name)')
     .eq('status', 'published')
     .order('published_at', { ascending: false })
     .limit(MAX_ARTICLES)
@@ -166,7 +166,7 @@ export default async function TrendingKeywordPage({ params }) {
   if (relatedByKeyword.length < MIN_MATCH_COUNT) {
     const { data: latestFallback } = await supabase
       .from('articles')
-      .select('id, title, slug, excerpt, featured_image_url, published_at, categories(name, slug), authors(name)')
+      .select('id, title, slug, excerpt, featured_image_url, published_at, categories:categories!articles_category_id_fkey(name, slug), authors(name)')
       .eq('status', 'published')
       .order('published_at', { ascending: false })
       .limit(12)

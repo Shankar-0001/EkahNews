@@ -1,7 +1,7 @@
 import { createOptionalPublicClient } from '@/lib/supabase/public-server'
 import { getArticleCanonicalUrl, SITE_URL } from '@/lib/site-config'
 import { filterEditorialCategories, isBlockedCategorySlug } from '@/lib/category-utils'
-import { runListQuery } from '@/lib/supabase/query-timeout'
+import { runRequiredListQuery as runListQuery } from '@/lib/supabase/query-timeout'
 
 export const revalidate = 3600
 
@@ -102,7 +102,7 @@ export default async function sitemap() {
     runListQuery(
       (signal) => supabase
         .from('articles')
-        .select('slug, canonical_url, updated_at, published_at, categories(slug), authors(slug)')
+        .select('slug, canonical_url, updated_at, published_at, categories:categories!articles_category_id_fkey(slug), authors(slug)')
         .eq('status', 'published')
         .order('published_at', { ascending: false })
         .abortSignal(signal),

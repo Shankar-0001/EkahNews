@@ -10,9 +10,27 @@ export default function OptionalGlobalScripts() {
   const adsenseScriptSrc = hasValidAdsenseClientId
     ? `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsenseClientId}`
     : null
+  const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID
+  const shouldLoadAnalytics = Boolean(gaMeasurementId)
 
   return (
     <>
+      {shouldLoadAnalytics && (
+        <>
+          <Script
+            src={`https://www.googletagmanager.com/gtag/js?id=${gaMeasurementId}`}
+            strategy="lazyOnload"
+          />
+          <Script id="google-gtag-init" strategy="lazyOnload">
+            {`
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+              gtag('config', '${gaMeasurementId}');
+            `}
+          </Script>
+        </>
+      )}
       {adsEnabled && adsenseScriptSrc && (
         <Script
           src={adsenseScriptSrc}

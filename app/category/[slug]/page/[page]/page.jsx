@@ -275,8 +275,8 @@ export default async function CategoryPagePaginated({ params }) {
       ? Promise.resolve({ data: [], count: 0 })
       : supabase
         .from('articles')
-        .select('id, title, slug, excerpt, featured_image_url, published_at, categories(name, slug), authors(name)', { count: 'exact' })
-        .eq('category_id', category.id)
+        .select('id, title, slug, excerpt, featured_image_url, published_at, categories:categories!articles_category_id_fkey(name, slug), authors(name), article_categories!inner(category_id)', { count: 'exact' })
+        .eq('article_categories.category_id', category.id)
         .eq('status', 'published')
         .order('published_at', { ascending: false })
         .range(0, to),

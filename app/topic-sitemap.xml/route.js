@@ -1,7 +1,7 @@
 import { createOptionalPublicClient } from '@/lib/supabase/public-server'
 import { absoluteUrl } from '@/lib/site-config'
 import { urlsetXml, xmlResponse } from '@/lib/sitemap-utils'
-import { runListQuery } from '@/lib/supabase/query-timeout'
+import { runRequiredListQuery as runListQuery } from '@/lib/supabase/query-timeout'
 
 const MAX_URLS = 50000
 const MIN_MATCH_COUNT = 3

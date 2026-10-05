@@ -1,14 +1,17 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { assertDeploymentTarget } from '@/lib/atomic-article.mjs'
+import { UUID } from '@/lib/navigation-model.mjs'
 import { apiResponse } from '@/lib/api-utils'
-import { requireAuth, canEditArticle } from '@/lib/auth-utils'
+import { requireRequestAuth, canEditArticle } from '@/lib/auth-utils'
 import { revalidatePath } from 'next/cache'
 
 export async function POST(request) {
     try {
+        assertDeploymentTarget()
         const relations = await request.json()
-        const user = await requireAuth()
-        const supabase = await createClient()
-        if (!Array.isArray(relations) || relations.length === 0) {
+        const user = await requireRequestAuth(request)
+        const supabase = createAdminClient()
+        if (!Array.isArray(relations) || relations.length === 0 || relations.length > 100 || relations.some(r => !UUID.test(r?.article_id || '') || !UUID.test(r?.tag_id || ''))) {
             return apiResponse(400, null, 'Relations must be a non-empty array')
         }
 
@@ -24,7 +27,7 @@ export async function POST(request) {
 
         const { error } = await supabase
             .from('article_tags')
-            .insert(relations)
+            .insert(relations.map(({article_id,tag_id}) => ({article_id,tag_id})))
         if (error) {
             return apiResponse(400, null, error.message)
         }
@@ -33,7 +36,7 @@ export async function POST(request) {
         const [{ data: article }, { data: tags }] = await Promise.all([
             supabase
                 .from('articles')
-                .select('slug, categories(slug)')
+                .select('slug, categories:categories!articles_category_id_fkey(slug)')
                 .eq('id', articleIds[0])
                 .maybeSingle(),
             tagIds.length > 0

@@ -133,7 +133,7 @@ export default async function ExplainedKeywordPage({ params }) {
 
   const articlesQuery = supabase
     .from('articles')
-    .select('id, title, slug, excerpt, content, featured_image_url, published_at, categories(name, slug)')
+    .select('id, title, slug, excerpt, content, featured_image_url, published_at, categories:categories!articles_category_id_fkey(name, slug)')
     .eq('status', 'published')
     .order('published_at', { ascending: false })
     .limit(MAX_ARTICLES)
@@ -157,7 +157,7 @@ export default async function ExplainedKeywordPage({ params }) {
   if (matched.length < MIN_MATCH_COUNT) {
     const { data: latestArticles } = await supabase
       .from('articles')
-      .select('id, title, slug, excerpt, content, featured_image_url, published_at, categories(name, slug)')
+      .select('id, title, slug, excerpt, content, featured_image_url, published_at, categories:categories!articles_category_id_fkey(name, slug)')
       .eq('status', 'published')
       .order('published_at', { ascending: false })
       .limit(12)

@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import KeywordInput from '@/components/dashboard/KeywordInput'
 import TagInput from '@/components/dashboard/TagInput'
 import { useToast } from '@/hooks/use-toast'
+import { filterHiddenDashboardCategories } from '@/lib/category-utils'
 
 const MIN_CONTENT_SLIDES = 1
 const RECOMMENDED_TITLE_LIMIT = 70
@@ -335,13 +336,13 @@ export default function WebStoryEditor({ mode = 'create', storyId = null }) {
 
         const [{ data: userRow }, { data: categoryRows }, { data: tagRows }] = await Promise.all([
           supabase.from('users').select('role').eq('id', authData.user.id).single(),
-          supabase.from('categories').select('id, name').order('name'),
+          supabase.from('categories').select('id, name, slug').order('name'),
           supabase.from('tags').select('id, name, slug').order('name'),
         ])
 
         const nextRole = userRow?.role || 'author'
         setUserRole(nextRole)
-        setCategories(categoryRows || [])
+        setCategories(filterHiddenDashboardCategories(categoryRows || []))
         setTags(tagRows || [])
 
         if (nextRole === 'admin') {

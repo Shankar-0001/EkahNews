@@ -35,6 +35,7 @@ export default function DashboardNav({ user, userRole }) {
   }
 
   const navItems = [
+    { title: 'Navigation', href: '/dashboard/navigation', icon: Menu, adminOnly: true },
     {
       title: 'Dashboard',
       href: '/dashboard',
@@ -48,6 +49,12 @@ export default function DashboardNav({ user, userRole }) {
     {
       title: 'Categories',
       href: '/dashboard/categories',
+      icon: FolderOpen,
+      adminOnly: true,
+    },
+    {
+      title: 'Subcategories',
+      href: '/dashboard/subcategories',
       icon: FolderOpen,
       adminOnly: true,
     },

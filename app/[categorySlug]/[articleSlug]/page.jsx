@@ -1,3 +1,5 @@
+import { cache } from 'react'
+import { publishedArticleFromHistory } from '@/lib/article-history.mjs'
 import { createOptionalPublicClient } from '@/lib/supabase/public-server'
 import dynamic from 'next/dynamic'
 import { notFound, permanentRedirect } from 'next/navigation'
@@ -14,7 +16,7 @@ import { calculateReadingTime, generateSixtySecondSummary } from '@/lib/content-
 import DynamicRelatedSidebar from '@/components/article/DynamicRelatedSidebar'
 import Breadcrumb from '@/components/common/Breadcrumb'
 import SafeHtml from '@/components/SafeHtml'
-import { getArticleCanonicalUrl, SITE_URL, slugFromText } from '@/lib/site-config'
+import { getArticleCanonicalUrl, SITE_URL, IS_NON_INDEXABLE_SITE, slugFromText } from '@/lib/site-config'
 import { buildArticleKeywords, keywordsToMetadataValue } from '@/lib/keywords'
 import { parseStructuredDataOverride } from '@/lib/seo-utils'
 import SchemaScript from '@/components/seo/SchemaScript'
@@ -51,11 +53,13 @@ const ARTICLE_METADATA_SELECT = `
         category_id,
         author_id,
         authors (id, name, slug),
-        categories (name, slug),
+        categories:categories!articles_category_id_fkey(name, slug),
         article_tags (tags (name, slug))
       `
 const ARTICLE_METADATA_SELECT_FALLBACK = ARTICLE_METADATA_SELECT.replace('        og_image,\n', '')
 const ARTICLE_PAGE_SELECT = `
+        seo_title,
+        seo_description,
         id,
         title,
         slug,
@@ -74,11 +78,28 @@ const ARTICLE_PAGE_SELECT = `
         status,
         category_id,
         author_id,
-        authors (id, slug, name, bio, avatar_url),
-        categories (name, slug),
+        authors (id, slug, name, bio, avatar_url, title, email),
+        categories:categories!articles_category_id_fkey(name, slug),
         article_tags (tags (id, name, slug))
       `
 const ARTICLE_PAGE_SELECT_FALLBACK = ARTICLE_PAGE_SELECT.replace('        og_image,\n', '')
+
+// Deduplicate only within one render request; never cache private/editor data.
+const readPublishedArticle = cache(async (slug, fallback = false) => {
+  const db = createOptionalPublicClient()
+  if (!db) return null
+  return runSingleQuery(signal => db.from('articles')
+    .select(fallback ? ARTICLE_PAGE_SELECT_FALLBACK : ARTICLE_PAGE_SELECT)
+    .eq('slug', slug).eq('status', 'published').maybeSingle().abortSignal(signal),
+    {label:'getArticleBySlug', throwOnUnavailable:true})
+})
+const readImageDimensions = cache(async url => {
+  if (!url) return null
+  const db = createOptionalPublicClient()
+  if (!db) return null
+  return runSingleQuery(signal => db.from('media_library').select('original_width, original_height')
+    .eq('file_url', url).maybeSingle().abortSignal(signal), {label:'getArticleImageMeta'})
+})
 
 function isMissingOgImageColumnError(error) {
   const message = error?.message || ''
@@ -96,7 +117,7 @@ export async function generateStaticParams() {
   const { data: articles } = await runListQuery(
     (signal) => supabase
       .from('articles')
-      .select('slug, categories(slug)')
+      .select('slug, categories:categories!articles_category_id_fkey(slug)')
       .eq('status', 'published')
       .limit(10)
       .abortSignal(signal),
@@ -123,31 +144,13 @@ export async function generateMetadata({ params }) {
 
     let article
     try {
-      article = await runSingleQuery(
-        (signal) => supabase
-          .from('articles')
-          .select(ARTICLE_METADATA_SELECT)
-          .eq('slug', articleSlug)
-          .eq('status', 'published')
-          .maybeSingle()
-          .abortSignal(signal),
-        { label: 'generateMetadata:getArticleBySlug' }
-      )
+      article = await readPublishedArticle(articleSlug)
     } catch (error) {
       if (!isMissingOgImageColumnError(error)) {
         throw error
       }
 
-      article = await runSingleQuery(
-        (signal) => supabase
-          .from('articles')
-          .select(ARTICLE_METADATA_SELECT_FALLBACK)
-          .eq('slug', articleSlug)
-          .eq('status', 'published')
-          .maybeSingle()
-          .abortSignal(signal),
-        { label: 'generateMetadata:getArticleBySlug:fallback' }
-      )
+      article = await readPublishedArticle(articleSlug, true)
     }
 
     if (!article) {
@@ -160,15 +163,7 @@ export async function generateMetadata({ params }) {
     const ogImage = article.og_image || article.featured_image_url || DEFAULT_OG_IMAGE
     let metadataImageMeta = null
     if (ogImage) {
-      metadataImageMeta = await runSingleQuery(
-        (signal) => supabase
-          .from('media_library')
-          .select('original_width, original_height')
-          .eq('file_url', ogImage)
-          .maybeSingle()
-          .abortSignal(signal),
-        { label: 'generateMetadata:getArticleImageMeta' }
-      )
+      metadataImageMeta = await readImageDimensions(ogImage)
     }
 
     const articleForMetadata = {
@@ -221,8 +216,9 @@ export async function generateMetadata({ params }) {
         },
       },
       robots: {
-        index: true,
-        follow: true,
+        index: !IS_NON_INDEXABLE_SITE,
+        noarchive: IS_NON_INDEXABLE_SITE,
+        follow: !IS_NON_INDEXABLE_SITE,
         'max-image-preview': 'large',
         'max-snippet': -1,
         'max-video-preview': -1,
@@ -251,29 +247,11 @@ export default async function ArticlePage({ params }) {
   let article
   let isDatabaseUnavailable = false
   try {
-    article = await runSingleQuery(
-      (signal) => supabase
-        .from('articles')
-        .select(ARTICLE_PAGE_SELECT)
-      .eq('slug', articleSlug)
-      .eq('status', 'published')
-      .maybeSingle()
-      .abortSignal(signal),
-      { label: 'getArticleBySlug', throwOnUnavailable: true }
-    )
+    article = await readPublishedArticle(articleSlug)
   } catch (error) {
     if (isMissingOgImageColumnError(error)) {
       try {
-        article = await runSingleQuery(
-          (signal) => supabase
-            .from('articles')
-            .select(ARTICLE_PAGE_SELECT_FALLBACK)
-            .eq('slug', articleSlug)
-            .eq('status', 'published')
-            .maybeSingle()
-            .abortSignal(signal),
-          { label: 'getArticleBySlug:fallback', throwOnUnavailable: true }
-        )
+        article = await readPublishedArticle(articleSlug, true)
       } catch (fallbackError) {
         if (fallbackError.message === 'DATABASE_UNAVAILABLE') {
           console.error('Article fetch failed: database unavailable', {
@@ -337,6 +315,8 @@ export default async function ArticlePage({ params }) {
   }
 
   if (!article) {
+    const historical = await publishedArticleFromHistory(supabase,articleSlug)
+    if (historical) permanentRedirect(`/${historical.categories?.slug || 'news'}/${historical.slug}`)
     notFound()
   }
 
@@ -345,49 +325,8 @@ export default async function ArticlePage({ params }) {
   }
 
   let authorProfile = article.authors || null
-  let featuredImageMeta = null
-
-  if (article.featured_image_url) {
-    try {
-      featuredImageMeta = await runSingleQuery(
-        (signal) => supabase
-          .from('media_library')
-          .select('original_width, original_height')
-          .eq('file_url', article.featured_image_url)
-          .maybeSingle()
-          .abortSignal(signal),
-        { label: 'getArticleImageMeta' }
-      )
-    } catch (error) {
-      console.error('Article image metadata fetch failed:', error?.message || error)
-      featuredImageMeta = null
-    }
-  }
-
-  if (
-    (
-      !authorProfile?.bio
-      || !authorProfile?.name
-      || !authorProfile?.slug
-      || !authorProfile?.title
-      || !authorProfile?.email
-    )
-    && article.author_id
-  ) {
-    try {
-      authorProfile = await runSingleQuery(
-        (signal) => supabase
-          .from('authors')
-          .select('id, slug, name, bio, avatar_url, title, email')
-          .eq('id', article.author_id)
-          .maybeSingle()
-          .abortSignal(signal),
-        { label: 'getAuthorProfile' }
-      ) || authorProfile
-    } catch (error) {
-      console.error('Author profile fetch failed:', error?.message || error)
-    }
-  }
+  const imageMetaPromise = readImageDimensions(article.featured_image_url)
+    .catch(() => null)
 
   const tagIds = (article.article_tags || [])
     .map((at) => at.tags?.id)
@@ -410,7 +349,7 @@ export default async function ArticlePage({ params }) {
       runListQuery(
         (signal) => supabase
           .from('articles')
-          .select('id, title, slug, excerpt, featured_image_url, published_at, categories(slug), authors(name)')
+          .select('id, title, slug, excerpt, featured_image_url, published_at, categories:categories!articles_category_id_fkey(slug), authors(name)')
           .eq('category_id', article.category_id)
           .eq('status', 'published')
           .neq('id', article.id)
@@ -422,7 +361,7 @@ export default async function ArticlePage({ params }) {
       runListQuery(
         (signal) => supabase
           .from('articles')
-          .select('id, title, slug, excerpt, featured_image_url, published_at, categories(slug), authors(name)')
+          .select('id, title, slug, excerpt, featured_image_url, published_at, categories:categories!articles_category_id_fkey(slug), authors(name)')
           .eq('status', 'published')
           .neq('id', article.id)
           .order('published_at', { ascending: false })
@@ -471,6 +410,8 @@ export default async function ArticlePage({ params }) {
     console.error('Supplementary article data fetch failed:', error?.message || error)
   }
 
+  const featuredImageMeta = await imageMetaPromise
+
     let relatedByTag = []
     const tagMatchCount = new Map()
     if (tagIds.length > 0 && (linkRows || []).length > 0) {
@@ -485,7 +426,7 @@ export default async function ArticlePage({ params }) {
           const { data: taggedArticles } = await runListQuery(
             (signal) => supabase
               .from('articles')
-              .select('id, title, slug, excerpt, featured_image_url, published_at, categories(slug), authors(name)')
+              .select('id, title, slug, excerpt, featured_image_url, published_at, categories:categories!articles_category_id_fkey(slug), authors(name)')
               .in('id', ids)
               .eq('status', 'published')
               .order('published_at', { ascending: false })
@@ -693,7 +634,7 @@ export default async function ArticlePage({ params }) {
                     fill
                     priority
                     className="object-cover"
-                    sizes="(max-width: 1280px) 100vw, 1200px"
+                    sizes="(max-width: 1023px) calc(100vw - 32px), (max-width: 1151px) calc(100vw - 64px), 1088px"
                   />
                 </div>
               </figure>

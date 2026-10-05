@@ -1,3 +1,5 @@
+import sharp from 'sharp'
+import { assertDeploymentTarget } from '@/lib/atomic-article.mjs'
 /**
  * Media Library API Routes
  * Handles GET (list), POST (upload), DELETE (remove) with auth and validation
@@ -131,20 +133,12 @@ export async function POST(request) {
             )
         }
 
-        const supabase = await createClient()
-        const adminSupabase = (() => {
-            try {
-                return createAdminClient()
-            } catch {
-                return null
-            }
-        })()
-
-        // Check authentication
-        const { data: { user }, error: authError } = await supabase.auth.getUser()
-        if (authError || !user) {
-            return apiResponse(401, null, { message: 'Unauthorized' })
-        }
+        assertDeploymentTarget()
+        const actor = await requireAuth()
+        if (!['admin', 'author'].includes(actor.role)) return apiResponse(403, null, {message:'Editor role required'})
+        const user = {id: actor.userId}
+        const supabase = createAdminClient()
+        const adminSupabase = supabase
 
         const formData = await request.formData()
         const file = formData.get('file')
@@ -179,7 +173,16 @@ export async function POST(request) {
         const month = String(now.getMonth() + 1).padStart(2, '0')
         const day = String(now.getDate()).padStart(2, '0')
         const sanitized = sanitizeFilename(file.name)
-        const filePath = `media/${year}/${month}/${day}/${Date.now()}_${sanitized}`
+        const folder = formData.get('folder') === 'articles' ? 'articles' : 'media'
+        const filePath = `${folder}/${year}/${month}/${day}/${crypto.randomUUID()}_${sanitized}`
+
+        let dimensions = null
+        if (file.type.startsWith('image/')) {
+            try {
+                const meta = await sharp(Buffer.from(await file.arrayBuffer())).metadata()
+                dimensions = {width:meta.width,height:meta.height}
+            } catch { return apiResponse(400, null, {message:'Image could not be decoded'}) }
+        }
 
         // Upload to Supabase Storage
         const storageClient = adminSupabase || supabase
@@ -197,21 +200,6 @@ export async function POST(request) {
             .from('media')
             .getPublicUrl(filePath)
 
-        // Get file dimensions for images
-        let dimensions = null
-        if (file.type.startsWith('image/')) {
-            try {
-                // Note: In production, use a library like 'image-size' on server
-                // For now, store dimensions from client metadata if available
-                const metadata = formData.get('dimensions')
-                if (metadata) {
-                    dimensions = JSON.parse(metadata)
-                }
-            } catch (err) {
-                console.warn('Could not extract image dimensions:', err)
-            }
-        }
-
         // Insert metadata into media_library table
         const { data: mediaRecord, error: insertError } = await supabase
             .from('media_library')
@@ -227,13 +215,18 @@ export async function POST(request) {
             })
             .select(MEDIA_SELECT)
 
-        if (insertError) throw insertError
+        if (insertError) {
+            const cleanup = await storageClient.storage.from('media').remove([filePath])
+            if (cleanup.error) console.error('New upload cleanup failed; uploaded object requires review')
+            throw insertError
+        }
 
         return apiResponse(201, {
             media: mediaRecord?.[0],
             message: 'File uploaded successfully',
         })
     } catch (error) {
+        if (error.name === 'AuthError') return apiResponse(401, null, {message:'Unauthorized'})
         console.error('Media POST error:', error)
         return apiResponse(500, null, {
             message: 'File upload failed',

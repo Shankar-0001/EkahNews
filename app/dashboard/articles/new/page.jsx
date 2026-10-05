@@ -1,5 +1,6 @@
 'use client'
 
+import { uploadArticleImage } from '@/lib/article-image-upload'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -25,6 +26,7 @@ import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import KeywordInput from '@/components/dashboard/KeywordInput'
 import TagInput from '@/components/dashboard/TagInput'
+import ArticleTaxonomyFields from '@/components/dashboard/ArticleTaxonomyFields'
 import ArticlePublishingChecklist from '@/components/dashboard/ArticlePublishingChecklist'
 import {
   Dialog,
@@ -67,6 +69,7 @@ function validateSubmissionReadiness({
 }) {
   if (!title.trim()) return 'Article title is required'
   if (!content.html || content.html.trim().length === 0) return 'Article content cannot be empty'
+    if (!categoryId) return 'A primary category is required, including for drafts'
   if (nextStatus !== 'draft' && nextStatus !== 'archived') {
     if (!categoryId) return 'Category is required before submission'
     if (!excerpt.trim()) return 'Excerpt is required before submission'
@@ -113,6 +116,9 @@ export default function ArticleEditorPage() {
   const [excerpt, setExcerpt] = useState('')
   const [content, setContent] = useState({ json: null, html: '' })
   const [categoryId, setCategoryId] = useState('')
+  const [additionalCategoryIds,setAdditionalCategoryIds]=useState([])
+  const [subcategoryId,setSubcategoryId]=useState('')
+  const [topicIds,setTopicIds]=useState([])
   const [selectedTags, setSelectedTags] = useState([])
   const [featuredImage, setFeaturedImage] = useState('')
   const [featuredImageAlt, setFeaturedImageAlt] = useState('')
@@ -145,6 +151,7 @@ export default function ArticleEditorPage() {
       content,
       categoryId,
       selectedTags,
+      additionalCategoryIds, subcategoryId, topicIds,
       featuredImage,
       featuredImageAlt,
       ogImage,
@@ -170,6 +177,7 @@ export default function ArticleEditorPage() {
     content,
     categoryId,
     selectedTags,
+    additionalCategoryIds, subcategoryId, topicIds,
     featuredImage,
     featuredImageAlt,
     ogImage,
@@ -233,14 +241,14 @@ export default function ArticleEditorPage() {
         .from('authors')
         .select('id')
         .eq('user_id', user.id)
-        .single()
+        .maybeSingle()
 
-      if (!authorData) {
+      if (!authorData && userData.role !== 'admin') {
         setError('No author profile found. Please contact an administrator.')
         return
       }
 
-      setAuthorId(authorData.id)
+      setAuthorId(authorData?.id || null)
 
       // Load categories and tags
       const [{ data: categoriesData }, { data: tagsData }] = await Promise.all([
@@ -276,7 +284,7 @@ export default function ArticleEditorPage() {
 
       setCategories(editorialCategories)
       setTags(tagsData || [])
-      setSelectedAuthorId(parsedDraft?.selectedAuthorId || authorData.id)
+      setSelectedAuthorId(parsedDraft?.selectedAuthorId || authorData?.id || '')
 
       if (parsedDraft) {
         setContentType(parsedDraft.contentType || 'news')
@@ -292,6 +300,9 @@ export default function ArticleEditorPage() {
             : ''
         )
         setSelectedTags(Array.isArray(parsedDraft.selectedTags) ? parsedDraft.selectedTags : [])
+        setAdditionalCategoryIds(Array.isArray(parsedDraft.additionalCategoryIds) ? parsedDraft.additionalCategoryIds : [])
+        setSubcategoryId(typeof parsedDraft.subcategoryId === 'string' ? parsedDraft.subcategoryId : '')
+        setTopicIds(Array.isArray(parsedDraft.topicIds) ? parsedDraft.topicIds : [])
         setFeaturedImage(parsedDraft.featuredImage || '')
         setFeaturedImageAlt(parsedDraft.featuredImageAlt || '')
         setOgImage(parsedDraft.ogImage || '')
@@ -309,6 +320,7 @@ export default function ArticleEditorPage() {
     } catch (err) {
       console.error('Error loading user data:', err)
       setError(err.message || 'Failed to load user data')
+    } finally {
       setInitializing(false)
     }
   }
@@ -360,45 +372,7 @@ export default function ArticleEditorPage() {
         // Compress image
         const compressedFile = await compressImage(file, 1920, 1920)
 
-        // Upload to Supabase Storage
-        const fileExt = file.name.split('.').pop()
-        const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
-        const filePath = generateStoragePath('articles', fileName)
-
-        const { data, error } = await supabase.storage
-          .from('media')
-          .upload(filePath, compressedFile)
-
-        if (error) {
-          toast({
-            variant: 'destructive',
-            title: 'Upload failed',
-            description: error.message,
-          })
-          resolve(null)
-          return
-        }
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('media')
-          .getPublicUrl(filePath)
-
-        // Save to media library
-        const { error: insertError } = await supabase.from('media_library').insert({
-          filename: file.name,
-          file_url: publicUrl,
-          file_path: filePath,
-          file_type: file.type,
-          file_size: file.size,
-          original_width: dimensions.width,
-          original_height: dimensions.height,
-          uploaded_by: user.id,
-        })
-
-        if (insertError) {
-          await supabase.storage.from('media').remove([filePath]).catch(() => {})
-          throw new Error(insertError.message || 'Failed to save media library metadata')
-        }
+        const publicUrl = await uploadArticleImage(compressedFile, file.name)
 
         toast({
           title: 'Success',
@@ -419,7 +393,7 @@ export default function ArticleEditorPage() {
   }
 
   const savArticle = async (newStatus) => {
-    const finalStatus = userRole === 'author' ? 'pending' : newStatus
+    const finalStatus = userRole === 'author' && newStatus !== 'draft' ? 'pending' : newStatus
     const readinessError = validateSubmissionReadiness({
       title,
       excerpt,
@@ -441,8 +415,8 @@ export default function ArticleEditorPage() {
       return
     }
 
-    if (!authorId) {
-      setError('Error: Could not find your author profile')
+    if (!(selectedAuthorId || authorId)) {
+      setError('Select an author before saving the article')
       return
     }
 
@@ -463,6 +437,10 @@ export default function ArticleEditorPage() {
         content: content.html,
         content_json: content.json,
         category_id: categoryId || null,
+        subcategory_id: subcategoryId || null,
+        additional_category_ids: additionalCategoryIds.filter(id=>id!==categoryId),
+        topic_ids: topicIds,
+        tag_ids: selectedTags,
         featured_image_url: featuredImage || null,
         featured_image_alt: featuredImageAlt?.trim() || null,
         og_image: ogImage.trim() || null,
@@ -492,24 +470,6 @@ export default function ArticleEditorPage() {
 
       const article = result?.data?.article
       createdArticleId = article?.id || null
-
-      if (selectedTags.length > 0 && article?.id) {
-        const tagRelations = selectedTags.map(tagId => ({
-          article_id: article.id,
-          tag_id: tagId,
-        }))
-
-        const tagsResponse = await fetch('/api/articles/tags', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(tagRelations),
-        })
-
-        if (!tagsResponse.ok) {
-          const tagsPayload = await tagsResponse.json().catch(() => ({}))
-          throw new Error(tagsPayload?.error || 'Article created, but selected tags could not be saved')
-        }
-      }
 
       const statusMessages = {
         draft: 'Article saved as draft',
@@ -727,16 +687,16 @@ export default function ArticleEditorPage() {
               <Card>
             <CardHeader>
               <CardTitle className="text-lg">
-                <RequiredLabel>Category</RequiredLabel>
+                <RequiredLabel>Primary category</RequiredLabel>
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <Select value={categoryId} onValueChange={val => setCategoryId(val === 'none' ? '' : val)}>
-                <SelectTrigger>
+              <Select value={categoryId} onValueChange={val => {setCategoryId(val);setSubcategoryId('');setAdditionalCategoryIds(ids=>ids.filter(id=>id!==val))}}>
+                <SelectTrigger aria-label="Primary category">
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
+                  
                   {categories.map(cat => (
                     <SelectItem key={cat.id} value={cat.id}>
                       {isFeedOnlyCategorySlug(cat.slug) ? `${cat.name} (legacy feed category)` : cat.name}
@@ -831,7 +791,8 @@ export default function ArticleEditorPage() {
             <CardTitle className="text-lg">Tags</CardTitle>
           </CardHeader>
           <CardContent>
-            <TagInput
+            <ArticleTaxonomyFields categories={categories} primaryId={categoryId} additionalIds={additionalCategoryIds} onAdditionalChange={setAdditionalCategoryIds} subcategoryId={subcategoryId} onSubcategoryChange={setSubcategoryId} topicIds={topicIds} onTopicsChange={setTopicIds}/>
+              <TagInput
               tags={tags}
               value={selectedTags}
               onChange={setSelectedTags}
@@ -1008,7 +969,7 @@ export default function ArticleEditorPage() {
                 Preview
               </Button>
 
-              {userRole === 'admin' && (
+              {['admin', 'author'].includes(userRole) && (
                 <>
                   <Button
                     variant="outline"

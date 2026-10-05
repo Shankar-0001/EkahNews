@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createOptionalPublicClient } from '@/lib/supabase/public-server'
 import { getArticleCanonicalUrl } from '@/lib/site-config'
 import { isBlockedCategorySlug } from '@/lib/category-utils'
-import { runListQuery } from '@/lib/supabase/query-timeout'
+import { runRequiredListQuery as runListQuery } from '@/lib/supabase/query-timeout'
 
 export const revalidate = 300
 
@@ -41,7 +41,7 @@ export async function GET() {
   const { data: articles } = await runListQuery(
     (signal) => supabase
       .from('articles')
-      .select('slug, title, canonical_url, published_at, categories(slug)')
+      .select('slug, title, canonical_url, published_at, categories:categories!articles_category_id_fkey(slug)')
       .eq('status', 'published')
       .gte('published_at', cutoffIso)
       .order('published_at', { ascending: false })

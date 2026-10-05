@@ -54,7 +54,7 @@ export async function GET(_request, context) {
   const { data: rows } = await runListQuery(
     (signal) => supabase
       .from('articles')
-      .select('slug, title, canonical_url, published_at, categories(slug)')
+      .select('slug, title, canonical_url, published_at, categories:categories!articles_category_id_fkey(slug)')
       .eq('status', 'published')
       .gte('published_at', cutoffIso)
       .order('published_at', { ascending: false })

@@ -1,3 +1,4 @@
+import { atomicArticleArguments, assertDeploymentTarget } from '@/lib/atomic-article.mjs'
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { apiResponse, logger } from '@/lib/api-utils'
@@ -21,12 +22,7 @@ function normalizeStructuredData(value) {
   }
 }
 
-function isMissingOgImageColumnError(error) {
-  const message = error?.message || ''
-  return typeof message === 'string'
-    && message.includes('og_image')
-    && message.toLowerCase().includes('column')
-}
+
 
 async function findDuplicateArticleByTitle(admin, title, excludeId) {
   const { data } = await admin
@@ -47,7 +43,7 @@ function revalidateArticleSurface(article) {
     if (article?.slug) {
       revalidatePath(`/${categorySlug}/${article.slug}`)
     }
-    revalidatePath('/')
+    revalidatePath('/', 'layout')
     revalidatePath('/latest-news')
     revalidatePath(`/category/${categorySlug}`)
     revalidatePath('/sitemap.xml')
@@ -67,6 +63,7 @@ export async function PATCH(request, { params }) {
   const AUTHOR_ALLOWED_STATUSES = ['draft', 'pending']
 
   try {
+    assertDeploymentTarget()
     const rateResult = checkRateLimit({
       key: `${getClientIp(request)}:articles:update`,
       limit: 60,
@@ -100,6 +97,7 @@ export async function PATCH(request, { params }) {
     } catch {
       return apiResponse(400, null, 'Invalid JSON payload')
     }
+    atomicArticleArguments(data, params.id)
     data.title = data.title?.trim?.() || data.title
     data.keywords = normalizeManualKeywords(data.keywords || [])
     data.schema_type = data.schema_type || 'NewsArticle'
@@ -125,7 +123,7 @@ export async function PATCH(request, { params }) {
 
     const { data: existingArticle } = await admin
       .from('articles')
-      .select('slug, excerpt, featured_image_url, featured_image_alt, seo_description, published_at, categories(slug), authors(slug)')
+      .select('slug, excerpt, featured_image_url, featured_image_alt, seo_description, published_at, categories:categories!articles_category_id_fkey(slug), authors(slug)')
       .eq('id', params.id)
       .maybeSingle()
 
@@ -156,6 +154,7 @@ export async function PATCH(request, { params }) {
       updated_at: data.updated_at || new Date().toISOString(),
     }
 
+    if (!updatePayload.published_at && existingArticle.published_at) updatePayload.published_at = existingArticle.published_at
     if (!updatePayload.published_at && updatePayload.status === 'published') {
       updatePayload.published_at = existingArticle.published_at || new Date().toISOString()
     }
@@ -164,24 +163,9 @@ export async function PATCH(request, { params }) {
       delete updatePayload.author_id
     }
 
-    let updatedArticle
-    let error
-    ;({ data: updatedArticle, error } = await admin
-      .from('articles')
-      .update(updatePayload)
-      .eq('id', params.id)
-      .select('id, title, slug, excerpt, content, content_json, featured_image_url, featured_image_alt, keywords, status, category_id, author_id, seo_title, seo_description, canonical_url, schema_type, structured_data, published_at, created_at, updated_at, categories(slug), authors(slug)')
-      .single())
-
-    if (error && isMissingOgImageColumnError(error)) {
-      const { og_image, ...fallbackPayload } = updatePayload
-      ;({ data: updatedArticle, error } = await admin
-        .from('articles')
-        .update(fallbackPayload)
-        .eq('id', params.id)
-        .select('id, title, slug, excerpt, content, content_json, featured_image_url, featured_image_alt, keywords, status, category_id, author_id, seo_title, seo_description, canonical_url, schema_type, structured_data, published_at, created_at, updated_at, categories(slug), authors(slug)')
-        .single())
-    }
+    const { data: updatedArticle, error } = await admin.rpc(
+      'save_article_with_taxonomy', atomicArticleArguments(updatePayload, params.id)
+    )
 
     if (error) {
       logger.error(`[${requestId}] Database error`, error)
@@ -210,6 +194,7 @@ export async function DELETE(request, { params }) {
   const requestId = `DELETE-article-${params.id}`
 
   try {
+    assertDeploymentTarget()
     const rateResult = checkRateLimit({
       key: `${getClientIp(request)}:articles:delete`,
       limit: 20,
@@ -246,7 +231,7 @@ export async function DELETE(request, { params }) {
     const admin = createAdminClient()
     const { data: existingArticle } = await admin
       .from('articles')
-      .select('slug, categories(slug), authors(slug)')
+      .select('slug, categories:categories!articles_category_id_fkey(slug), authors(slug)')
       .eq('id', params.id)
       .maybeSingle()
 
@@ -274,4 +259,15 @@ export async function DELETE(request, { params }) {
     logger.error(requestId, error)
     return apiResponse(500, null, 'An internal error occurred')
   }
+}
+
+export async function GET(request, { params }) {
+  try {
+    assertDeploymentTarget()
+    const user=await requireRequestAuth(request)
+    if (!await canEditArticle(params.id,user)) return apiResponse(403,null,'Cannot view this article in the editor')
+    const {data,error}=await createAdminClient().from('articles').select('*,article_tags(tag_id),article_categories(category_id,is_primary),article_topics(topic_id)').eq('id',params.id).single()
+    if(error) return apiResponse(404,null,'Article not found')
+    return apiResponse(200,{article:data})
+  } catch(error) {return apiResponse(error.name==='AuthError'?401:500,null,'Article could not be loaded')}
 }

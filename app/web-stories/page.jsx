@@ -69,6 +69,7 @@ export default async function WebStoriesPage() {
       <PublicHeader categories={filteredCategories} />
 
       <main className="w-full max-w-6xl mx-auto px-4 py-10">
+        <h1 className="sr-only">Web Stories</h1>
         <div className="mb-6">
           <Breadcrumb items={[{ label: 'Web Stories', href: '/web-stories' }]} />
         </div>

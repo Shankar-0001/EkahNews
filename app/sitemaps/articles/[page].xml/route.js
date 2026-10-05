@@ -19,7 +19,7 @@ export async function GET(_request, context) {
   const { data: rows } = await runListQuery(
     (signal) => supabase
       .from('articles')
-      .select('slug, canonical_url, updated_at, published_at, categories(slug)')
+      .select('slug, canonical_url, updated_at, published_at, categories:categories!articles_category_id_fkey(slug)')
       .eq('status', 'published')
       .order('published_at', { ascending: false })
       .range(from, to)

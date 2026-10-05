@@ -50,7 +50,7 @@ export default async function SearchPage({ searchParams }) {
 
   const { data: articles, error } = await supabase
     .from('articles')
-    .select('id, title, slug, excerpt, published_at, categories(name, slug), authors(name)')
+    .select('id, title, slug, excerpt, published_at, categories:categories!articles_category_id_fkey(name, slug), authors(name)')
     .eq('status', 'published')
     .ilike('title', `%${query}%`)
     .order('published_at', { ascending: false })

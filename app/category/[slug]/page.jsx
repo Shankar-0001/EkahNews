@@ -103,9 +103,9 @@ export async function generateMetadata({ params }) {
       runListQuery(
         (signal) => supabase
           .from('articles')
-          .select('id', { count: 'exact', head: true })
+          .select('id, article_categories!inner(category_id)', { count: 'exact', head: true })
           .eq('status', 'published')
-          .eq('category_id', category.id)
+          .eq('article_categories.category_id', category.id)
           .abortSignal(signal),
         { label: 'generateCategoryMetadata:getArticleCount' }
       ),
@@ -286,8 +286,8 @@ export default async function CategoryPage({ params }) {
       : runListQuery(
         (signal) => supabase
           .from('articles')
-          .select('id, title, slug, excerpt, featured_image_url, published_at, categories(name, slug), authors(name)', { count: 'exact' })
-          .eq('category_id', category?.id || '__missing__')
+          .select('id, title, slug, excerpt, featured_image_url, published_at, categories:categories!articles_category_id_fkey(name, slug), authors(name), article_categories!inner(category_id)', { count: 'exact' })
+          .eq('article_categories.category_id', category?.id || '__missing__')
           .eq('status', 'published')
           .order('published_at', { ascending: false })
           .range(0, PAGE_SIZE - 1)
@@ -340,6 +340,7 @@ export default async function CategoryPage({ params }) {
       <PublicHeader categories={filteredCategories} />
 
       <main className="mx-auto w-full max-w-6xl px-4 py-10 md:py-12">
+        <h1 className="sr-only">{categoryDisplayName}</h1>
         <div className="mb-6">
           <Breadcrumb items={[{ label: categoryDisplayName, href: '/category/' + categorySlug }]} />
         </div>

@@ -1,5 +1,8 @@
 'use client'
+import SafeHtmlPreview from '@/components/SafeHtmlPreview'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
+import { uploadArticleImage } from '@/lib/article-image-upload'
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -22,6 +25,7 @@ import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import KeywordInput from '@/components/dashboard/KeywordInput'
 import TagInput from '@/components/dashboard/TagInput'
+import ArticleTaxonomyFields from '@/components/dashboard/ArticleTaxonomyFields'
 import ArticlePublishingChecklist from '@/components/dashboard/ArticlePublishingChecklist'
 import {
     AlertDialog,
@@ -62,6 +66,7 @@ function validateSubmissionReadiness({
 }) {
     if (!title.trim()) return 'Article title is required'
     if (!content.html || content.html.trim().length === 0) return 'Article content cannot be empty'
+    if (!categoryId) return 'A primary category is required, including for drafts'
     if (nextStatus !== 'draft' && nextStatus !== 'archived') {
         if (!categoryId) return 'Category is required before submission'
         if (!excerpt.trim()) return 'Excerpt is required before submission'
@@ -110,6 +115,10 @@ export default function EditArticlePage() {
     const [excerpt, setExcerpt] = useState('')
     const [content, setContent] = useState({ json: null, html: '' })
     const [categoryId, setCategoryId] = useState('')
+  const [additionalCategoryIds,setAdditionalCategoryIds]=useState([])
+  const [showPreview, setShowPreview] = useState(false)
+  const [subcategoryId,setSubcategoryId]=useState('')
+  const [topicIds,setTopicIds]=useState([])
     const [selectedTags, setSelectedTags] = useState([])
     const [featuredImage, setFeaturedImage] = useState('')
     const [featuredImageAlt, setFeaturedImageAlt] = useState('')
@@ -155,20 +164,16 @@ export default function EditArticlePage() {
                 .from('authors')
                 .select('id')
                 .eq('user_id', user.id)
-                .single()
+                .maybeSingle()
 
             setAuthorId(authorData?.id)
             setSelectedAuthorId(authorData?.id || '')
 
             // Load the article
-            const { data: articleData, error: articleError } = await supabase
-                .from('articles')
-                .select(`
-          *,
-          article_tags (tag_id)
-        `)
-                .eq('id', params.id)
-                .single()
+            const articleResponse = await fetch('/api/articles/'+params.id,{cache:'no-store'})
+            const articleBody = await articleResponse.json()
+            const articleData = articleBody.data?.article
+            const articleError = !articleResponse.ok
 
             if (articleError || !articleData) {
                 setError('Article not found')
@@ -189,6 +194,9 @@ export default function EditArticlePage() {
             setExcerpt(articleData.excerpt || '')
             setContent({ json: articleData.content_json, html: articleData.content || '' })
             setCategoryId(articleData.category_id || '')
+            setAdditionalCategoryIds((articleData.article_categories || []).filter(r=>!r.is_primary).map(r=>r.category_id))
+            setSubcategoryId(articleData.subcategory_id || '')
+            setTopicIds((articleData.article_topics || []).map(r=>r.topic_id))
             setSelectedAuthorId(articleData.author_id || authorData?.id || '')
             setFeaturedImage(articleData.featured_image_url || '')
             setFeaturedImageAlt(articleData.featured_image_alt || '')
@@ -298,47 +306,9 @@ export default function EditArticlePage() {
                     return
                 }
 
-                // Upload to Supabase Storage
-                const fileExt = file.name.split('.').pop()
-                const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
-                const filePath = generateStoragePath('articles', fileName)
+                const publicUrl = await uploadArticleImage(compressedFile, file.name)
 
-                const { data, error } = await supabase.storage
-                    .from('media')
-                    .upload(filePath, compressedFile)
-
-                if (error) {
-                    toast({
-                        variant: 'destructive',
-                        title: 'Upload failed',
-                        description: error.message,
-                    })
-                    resolve(null)
-                    return
-                }
-
-                const { data: { publicUrl } } = supabase.storage
-                    .from('media')
-                    .getPublicUrl(filePath)
-
-                // Save to media library
-                const { error: insertError } = await supabase.from('media_library').insert({
-                    filename: file.name,
-                    file_url: publicUrl,
-                    file_path: filePath,
-                    file_type: file.type,
-                    file_size: file.size,
-                    original_width: dimensions.width,
-                    original_height: dimensions.height,
-                    uploaded_by: user.id,
-                })
-
-                if (insertError) {
-                    await supabase.storage.from('media').remove([filePath]).catch(() => {})
-                    throw new Error(insertError.message || 'Failed to save media library metadata')
-                }
-
-                toast({
+        toast({
                     title: 'Success',
                     description: `Image uploaded (${formatFileSize(compressedFile.size)})`,
                 })
@@ -397,6 +367,10 @@ export default function EditArticlePage() {
                 content: content.html,
                 content_json: content.json,
                 category_id: categoryId || null,
+        subcategory_id: subcategoryId || null,
+        additional_category_ids: additionalCategoryIds.filter(id=>id!==categoryId),
+        topic_ids: topicIds,
+        tag_ids: selectedTags,
                 featured_image_url: featuredImage || null,
                 featured_image_alt: featuredImageAlt?.trim() || null,
                 og_image: ogImage.trim() || null,
@@ -423,27 +397,6 @@ export default function EditArticlePage() {
 
             if (!response.ok) {
                 throw new Error(getApiErrorMessage(result.error, 'Failed to update article'))
-            }
-
-            const deleteTagsResponse = await fetch(`/api/articles/${params.id}/tags`, { method: 'DELETE' })
-            if (!deleteTagsResponse.ok) {
-                const deletePayload = await deleteTagsResponse.json().catch(() => ({}))
-                throw new Error(deletePayload?.error || 'Failed to clear existing tags')
-            }
-
-            if (selectedTags.length > 0) {
-                const addTagsResponse = await fetch('/api/articles/tags', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(
-                        selectedTags.map(tagId => ({ article_id: params.id, tag_id: tagId }))
-                    ),
-                })
-
-                if (!addTagsResponse.ok) {
-                    const addPayload = await addTagsResponse.json().catch(() => ({}))
-                    throw new Error(addPayload?.error || 'Failed to save selected tags')
-                }
             }
 
             toast({
@@ -555,12 +508,8 @@ export default function EditArticlePage() {
                     <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Edit Article</h1>
                     <p className="text-gray-600 dark:text-gray-400 mt-2">Update your article content and settings</p>
                 </div>
-                <Link href={`/${previewCategorySlug}/${slug}`} target="_blank">
-                    <Button variant="outline">
-                        <Eye className="mr-2 h-4 w-4" />
-                        Preview
-                    </Button>
-                </Link>
+                <><Button variant="outline" onClick={() => setShowPreview(true)}><Eye className="mr-2 h-4 w-4" />Preview</Button>
+                <Dialog open={showPreview} onOpenChange={setShowPreview}><DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>Article Preview</DialogTitle></DialogHeader><p className="text-sm text-muted-foreground">Unsaved editor preview. This does not publish the article.</p><h1 className="text-3xl font-bold">{title}</h1><p>{excerpt}</p>{featuredImage && <img src={featuredImage} alt={featuredImageAlt || title} className="w-full rounded" />}<SafeHtmlPreview html={content.html} className="prose max-w-none" /></DialogContent></Dialog></>
             </div>
 
             <div className="space-y-6">
@@ -637,16 +586,16 @@ export default function EditArticlePage() {
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-lg">
-                                <RequiredLabel>Category</RequiredLabel>
+                                <RequiredLabel>Primary category</RequiredLabel>
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <Select value={categoryId} onValueChange={val => setCategoryId(val === 'none' ? '' : val)}>
-                                <SelectTrigger>
+                            <Select disabled={Boolean(article?.published_at || article?.status === 'published')} value={categoryId} onValueChange={val => {setCategoryId(val);setSubcategoryId('');setAdditionalCategoryIds(ids=>ids.filter(id=>id!==val))}}>
+                                <SelectTrigger aria-label="Primary category">
                                     <SelectValue placeholder="Select category" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="none">None</SelectItem>
+                                    
                                     {categories.map(cat => (
                                         <SelectItem key={cat.id} value={cat.id}>
                                             {isFeedOnlyCategorySlug(cat.slug) ? `${cat.name} (legacy feed category)` : cat.name}
@@ -741,7 +690,8 @@ export default function EditArticlePage() {
                         <CardTitle className="text-lg">Tags</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <TagInput
+                        <ArticleTaxonomyFields categories={categories} primaryId={categoryId} additionalIds={additionalCategoryIds} onAdditionalChange={setAdditionalCategoryIds} subcategoryId={subcategoryId} onSubcategoryChange={setSubcategoryId} topicIds={topicIds} onTopicsChange={setTopicIds}/>
+              <TagInput
                             tags={tags}
                             value={selectedTags}
                             onChange={setSelectedTags}

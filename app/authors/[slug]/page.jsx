@@ -1,3 +1,4 @@
+import { authorLookupFilter } from '@/lib/author-lookup.mjs'
 import { createClient } from '@/lib/supabase/server'
 import { notFound, permanentRedirect } from 'next/navigation'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
@@ -17,15 +18,17 @@ import { filterBlockedCategories } from '@/lib/category-utils'
 import { runListQuery, runSingleQuery } from '@/lib/supabase/query-timeout'
 
 async function findAuthorBySlug(rawSlug) {
+  const lookup = authorLookupFilter(rawSlug)
+  if (!lookup) return null
   const supabase = await createClient()
-  const alternateSlug = rawSlug?.startsWith('@') ? rawSlug.slice(1) : `@${rawSlug}`
+
   const nameCandidate = rawSlug?.replace(/-/g, ' ')
 
   let author = await runSingleQuery(
     (signal) => supabase
       .from('authors')
       .select('id, slug, name, bio, avatar_url, title, social_links')
-      .or(`slug.eq.${rawSlug},slug.eq.${alternateSlug},id.eq.${rawSlug}`)
+      .or(lookup)
       .maybeSingle()
       .abortSignal(signal),
     { label: `authorMetadata:${rawSlug}:primaryLookup` }
@@ -154,7 +157,7 @@ export default async function AuthorProfilePage({ params }) {
         excerpt,
         featured_image_url,
         published_at,
-        categories (name, slug),
+        categories:categories!articles_category_id_fkey(name, slug),
         authors (name)
       `)
       .eq('author_id', author.id)
@@ -178,7 +181,7 @@ export default async function AuthorProfilePage({ params }) {
         excerpt,
         featured_image_url,
         published_at,
-        categories (name, slug),
+        categories:categories!articles_category_id_fkey(name, slug),
         authors!inner (id, name, slug)
       `)
       .eq('status', 'published')
