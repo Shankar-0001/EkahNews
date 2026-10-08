@@ -15,6 +15,9 @@ export async function generateMetadata() {
     description: override?.seo_description
       || definition?.seoDescription
       || 'Partner with EkahNews to reach engaged readers across key news categories.',
+    alternates: {
+      canonical: absoluteUrl('/advertise'),
+    },
   }
 }
 

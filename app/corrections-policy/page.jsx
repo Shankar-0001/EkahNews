@@ -15,6 +15,9 @@ export async function generateMetadata() {
     description: override?.seo_description
       || definition?.seoDescription
       || 'How EkahNews handles corrections, clarifications, and updates.',
+    alternates: {
+      canonical: absoluteUrl('/corrections-policy'),
+    },
   }
 }
 

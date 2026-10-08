@@ -15,6 +15,9 @@ export async function generateMetadata() {
     description: override?.seo_description
       || definition?.seoDescription
       || 'Read EkahNews editorial standards, sourcing guidelines, and content policies.',
+    alternates: {
+      canonical: absoluteUrl('/editorial-policy'),
+    },
   }
 }
 

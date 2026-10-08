@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
-import { Bot, Briefcase, ChevronDown, Cpu, Menu, Moon, Newspaper, Search, Share2, Sparkles, Star, Sun, TrendingUp, X } from 'lucide-react'
+import { Bot, Briefcase, Cpu, Menu, Moon, Newspaper, Search, Share2, Sparkles, Star, Sun, TrendingUp, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useTheme } from 'next-themes'

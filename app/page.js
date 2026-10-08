@@ -2,7 +2,7 @@ import { createOptionalPublicClient } from '@/lib/supabase/public-server'
 import { Fragment } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { ArrowRight, Clock3, TrendingUp } from 'lucide-react'
+import { ArrowRight, Clock3 } from 'lucide-react'
 import StructuredData, { OrganizationSchema, WebSiteSchema } from '@/components/seo/StructuredData'
 import PublicHeader from '@/components/layout/PublicHeader'
 import ContentUnavailableNotice from '@/components/common/ContentUnavailableNotice'
@@ -152,22 +152,6 @@ function TextHeadline({ article, href, className = '' }) {
 
 function getStoriesForSlugs(articles, slugs) {
   return articles.filter((article) => slugs.includes(article?.categories?.slug)).slice(0, 6)
-}
-
-function SidebarNewsItem({ article }) {
-  return (
-    <Link
-      href={getArticleHref(article)}
-      className="grid grid-cols-[58px_1fr] gap-2 border-b border-slate-100 py-2 last:border-b-0 dark:border-slate-800"
-    >
-      <StoryThumb article={article} className="h-[44px] w-[58px]" sizes="58px" />
-      <div className="min-w-0">
-        <p className="font-title text-[13px] font-semibold leading-snug text-[var(--c-heading)] line-clamp-3 dark:text-white">
-          {article.title}
-        </p>
-      </div>
-    </Link>
-  )
 }
 
 export default async function HomePage() {
